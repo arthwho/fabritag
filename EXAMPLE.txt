@@ -1,0 +1,427 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  LayoutDashboard, 
+  Package, 
+  Video, 
+  Radio, 
+  ArrowRightLeft, 
+  Plus, 
+  MapPin, 
+  Activity,
+  Box,
+  Truck
+} from 'lucide-react';
+
+// --- MOCK DATA INICIAL (Simulando o Banco de Dados JSON) ---
+const INITIAL_DATA = {
+  produtos: [
+    { id: 1, nome: "Prego Aço 15x15", sku: "PRE-15-ACO", tipo: "Granel", status: "Armazenado", local: "Câmara 1" },
+    { id: 2, nome: "Parafuso Sextavado", sku: "PAR-SEX-10", tipo: "Unidade", status: "Em Trânsito", local: "Corredor B" },
+    { id: 3, nome: "Porca 10mm", sku: "POR-10-INOX", tipo: "Granel", status: "Armazenado", local: "Câmara 2" },
+  ],
+  camaras: [
+    { id: 1, nome: "Câmara Fria 01", predio: "Bloco A", temperatura: "-5°C" },
+    { id: 2, nome: "Câmara Seca 02", predio: "Bloco B", temperatura: "22°C" },
+    { id: 3, nome: "Doca de Expedição", predio: "Bloco C", temperatura: "Ambiente" }
+  ],
+  sensores: [
+    { id: 1, modelo: "PN5180", ip: "192.168.1.101", local_id: 1, status: "Ativo" },
+    { id: 2, modelo: "PN5180", ip: "192.168.1.102", local_id: 2, status: "Ativo" },
+    { id: 3, modelo: "ESP32-CAM", ip: "192.168.1.200", local_id: 3, status: "Inativo" }
+  ],
+  historico: [
+    { id: 1, produto: "Prego Aço 15x15", origem: "Produção", destino: "Câmara 1", data: "2026-01-02 08:30" },
+    { id: 2, produto: "Parafuso Sextavado", origem: "Câmara 1", destino: "Corredor B", data: "2026-01-02 09:15" }
+  ]
+};
+
+// --- COMPONENTES UI (Estilo Flowbite/Tailwind) ---
+
+const Card = ({ title, value, icon: Icon, color = "blue" }) => (
+  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center justify-between">
+    <div>
+      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+      <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+    </div>
+    <div className={`p-3 rounded-full bg-${color}-50 text-${color}-600`}>
+      <Icon size={24} />
+    </div>
+  </div>
+);
+
+const Button = ({ children, onClick, variant = "primary", className = "" }) => {
+  const baseStyle = "px-4 py-2 rounded-lg font-medium text-sm transition-colors focus:ring-4 focus:outline-none";
+  const variants = {
+    primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300",
+    secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-200",
+    success: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-300"
+  };
+  return (
+    <button onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`}>
+      {children}
+    </button>
+  );
+};
+
+const Table = ({ headers, children }) => (
+  <div className="overflow-x-auto relative shadow-md sm:rounded-lg border border-gray-200">
+    <table className="w-full text-sm text-left text-gray-500">
+      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+        <tr>
+          {headers.map((h, i) => <th key={i} scope="col" className="py-3 px-6">{h}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {children}
+      </tbody>
+    </table>
+  </div>
+);
+
+const Badge = ({ status }) => {
+  let color = "gray";
+  if (status === "Ativo" || status === "Armazenado") color = "green";
+  if (status === "Inativo" || status === "Em Trânsito") color = "yellow";
+  
+  return (
+    <span className={`bg-${color}-100 text-${color}-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded`}>
+      {status}
+    </span>
+  );
+};
+
+// --- APP PRINCIPAL ---
+
+export default function FabritagApp() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [data, setData] = useState(INITIAL_DATA);
+  
+  // Estados de Formulário
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState(''); // 'produto', 'sensor', 'movimentacao'
+  
+  const [formData, setFormData] = useState({});
+
+  // Simulação de "Fetch" inicial
+  useEffect(() => {
+    // Aqui conectaria com o backend Python
+    console.log("Sistema iniciado. Modo Simulação Local.");
+  }, []);
+
+  // Handlers
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (modalType === 'produto') {
+      const newProduct = {
+        id: data.produtos.length + 1,
+        nome: formData.nome,
+        sku: formData.sku,
+        tipo: formData.tipo,
+        status: "Aguardando",
+        local: "Recebimento"
+      };
+      setData(prev => ({ ...prev, produtos: [...prev.produtos, newProduct] }));
+    } else if (modalType === 'sensor') {
+      const newSensor = {
+        id: data.sensores.length + 1,
+        modelo: formData.modelo,
+        ip: formData.ip,
+        local_id: parseInt(formData.local_id),
+        status: "Ativo"
+      };
+      setData(prev => ({ ...prev, sensores: [...prev.sensores, newSensor] }));
+    } else if (modalType === 'movimentacao') {
+      const produtoId = parseInt(formData.produto_id);
+      const destinoId = parseInt(formData.destino_id);
+      
+      const produto = data.produtos.find(p => p.id === produtoId);
+      const destino = data.camaras.find(c => c.id === destinoId);
+
+      // Atualiza produto
+      const updatedProdutos = data.produtos.map(p => 
+        p.id === produtoId ? { ...p, local: destino.nome, status: "Armazenado" } : p
+      );
+
+      // Adiciona histórico
+      const newMov = {
+        id: data.historico.length + 1,
+        produto: produto.nome,
+        origem: produto.local,
+        destino: destino.nome,
+        data: new Date().toLocaleString()
+      };
+
+      setData(prev => ({
+        ...prev,
+        produtos: updatedProdutos,
+        historico: [newMov, ...prev.historico]
+      }));
+    }
+    setShowModal(false);
+    setFormData({});
+  };
+
+  // Views
+  const renderDashboard = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card title="Total Produtos" value={data.produtos.length} icon={Box} color="blue" />
+        <Card title="Sensores Ativos" value={data.sensores.filter(s => s.status === 'Ativo').length} icon={Radio} color="green" />
+        <Card title="Câmaras Monitoradas" value={data.camaras.length} icon={Video} color="purple" />
+        <Card title="Movimentações Hoje" value={data.historico.length} icon={Activity} color="orange" />
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Últimas Movimentações</h3>
+        </div>
+        <div className="p-0">
+          <Table headers={["Produto", "Origem", "Destino", "Data/Hora"]}>
+            {data.historico.map(h => (
+              <tr key={h.id} className="bg-white border-b hover:bg-gray-50">
+                <td className="py-4 px-6 font-medium text-gray-900">{h.produto}</td>
+                <td className="py-4 px-6">{h.origem}</td>
+                <td className="py-4 px-6 text-blue-600 font-medium">{h.destino}</td>
+                <td className="py-4 px-6 text-gray-500">{h.data}</td>
+              </tr>
+            ))}
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProdutos = () => (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-800">Catálogo de Produtos</h2>
+        <Button onClick={() => { setModalType('produto'); setShowModal(true); }}>
+          <Plus size={18} className="inline mr-2" /> Novo Produto
+        </Button>
+      </div>
+      <Table headers={["SKU", "Nome", "Tipo", "Local Atual", "Status"]}>
+        {data.produtos.map(p => (
+          <tr key={p.id} className="bg-white border-b hover:bg-gray-50">
+            <td className="py-4 px-6 font-mono text-xs">{p.sku}</td>
+            <td className="py-4 px-6 font-medium text-gray-900">{p.nome}</td>
+            <td className="py-4 px-6">{p.tipo}</td>
+            <td className="py-4 px-6">{p.local}</td>
+            <td className="py-4 px-6"><Badge status={p.status} /></td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  );
+
+  const renderInfra = () => (
+    <div className="space-y-8">
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Video className="text-gray-500" /> Câmaras & Ambientes
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {data.camaras.map(c => (
+            <div key={c.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold text-gray-800">{c.nome}</h3>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{c.predio}</span>
+              </div>
+              <div className="mt-4 flex items-center text-gray-500 text-sm">
+                <Activity size={16} className="mr-2" /> Temp: {c.temperatura}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Radio className="text-gray-500" /> Sensores IoT
+          </h2>
+          <Button variant="secondary" onClick={() => { setModalType('sensor'); setShowModal(true); }}>
+            <Plus size={16} className="inline mr-1" /> Adicionar Sensor
+          </Button>
+        </div>
+        <Table headers={["ID", "Modelo", "IP Address", "Local", "Status"]}>
+          {data.sensores.map(s => (
+            <tr key={s.id} className="bg-white border-b hover:bg-gray-50">
+              <td className="py-4 px-6 text-gray-500">#{s.id}</td>
+              <td className="py-4 px-6 font-medium">{s.modelo}</td>
+              <td className="py-4 px-6 font-mono text-xs">{s.ip}</td>
+              <td className="py-4 px-6">
+                {data.camaras.find(c => c.id === s.local_id)?.nome || "Não alocado"}
+              </td>
+              <td className="py-4 px-6"><Badge status={s.status} /></td>
+            </tr>
+          ))}
+        </Table>
+      </div>
+    </div>
+  );
+
+  const renderMovimentacao = () => (
+    <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center p-3 bg-blue-50 rounded-full mb-4">
+          <ArrowRightLeft className="text-blue-600 h-8 w-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Movimentação Manual</h2>
+        <p className="text-gray-500">Simule o movimento de um lote entre câmaras</p>
+      </div>
+
+      <form onSubmit={(e) => { e.preventDefault(); setModalType('movimentacao'); handleSubmit(e); }} className="space-y-6">
+        <div>
+          <label className="block mb-2 text-sm font-medium text-gray-900">Produto / Lote</label>
+          <select 
+            name="produto_id" 
+            required
+            onChange={handleInputChange}
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+          >
+            <option value="">Selecione um produto...</option>
+            {data.produtos.map(p => (
+              <option key={p.id} value={p.id}>{p.sku} - {p.nome} (Em: {p.local})</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-center">
+          <Truck className="text-gray-400" />
+        </div>
+
+        <div>
+          <label className="block mb-2 text-sm font-medium text-gray-900">Destino (Câmara/Setor)</label>
+          <select 
+            name="destino_id"
+            required
+            onChange={handleInputChange}
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+          >
+            <option value="">Selecione o destino...</option>
+            {data.camaras.map(c => (
+              <option key={c.id} value={c.id}>{c.nome} ({c.predio})</option>
+            ))}
+          </select>
+        </div>
+
+        <Button className="w-full justify-center py-3" variant="primary">
+          Confirmar Movimentação
+        </Button>
+      </form>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
+        <div className="p-6 border-b border-gray-100 flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">F</div>
+          <span className="text-xl font-bold text-gray-800">Fabritag</span>
+        </div>
+        
+        <nav className="flex-1 p-4 space-y-2">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <LayoutDashboard size={20} />
+            <span className="font-medium">Dashboard</span>
+          </button>
+          
+          <button onClick={() => setActiveTab('produtos')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'produtos' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <Package size={20} />
+            <span className="font-medium">Produtos</span>
+          </button>
+          
+          <button onClick={() => setActiveTab('infra')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'infra' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <MapPin size={20} />
+            <span className="font-medium">Infraestrutura</span>
+          </button>
+
+          <div className="pt-4 mt-4 border-t border-gray-100">
+            <p className="px-4 text-xs font-semibold text-gray-400 uppercase mb-2">Operação</p>
+            <button onClick={() => setActiveTab('movimentacao')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'movimentacao' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+              <ArrowRightLeft size={20} />
+              <span className="font-medium">Movimentar Lote</span>
+            </button>
+          </div>
+        </nav>
+
+        <div className="p-4 border-t border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">OP</div>
+            <div className="text-sm">
+              <p className="font-medium text-gray-900">Operador</p>
+              <p className="text-gray-500 text-xs">Fabritag Admin</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10">
+           <span className="font-bold text-lg">Fabritag</span>
+           <div className="flex gap-4">
+             <LayoutDashboard onClick={() => setActiveTab('dashboard')} />
+             <ArrowRightLeft onClick={() => setActiveTab('movimentacao')} />
+           </div>
+        </div>
+
+        <div className="p-8">
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 capitalize">
+              {activeTab === 'infra' ? 'Infraestrutura' : activeTab}
+            </h1>
+            <p className="text-gray-500 mt-1">Visão geral e gestão em tempo real.</p>
+          </header>
+
+          {activeTab === 'dashboard' && renderDashboard()}
+          {activeTab === 'produtos' && renderProdutos()}
+          {activeTab === 'infra' && renderInfra()}
+          {activeTab === 'movimentacao' && renderMovimentacao()}
+        </div>
+      </main>
+
+      {/* Modal Genérico */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold mb-4 capitalize">Adicionar {modalType}</h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {modalType === 'produto' && (
+                <>
+                  <input name="nome" placeholder="Nome do Produto" required onChange={handleInputChange} className="w-full p-2 border rounded" />
+                  <input name="sku" placeholder="SKU (Ex: PRE-10)" required onChange={handleInputChange} className="w-full p-2 border rounded" />
+                  <input name="tipo" placeholder="Tipo (Granel/Unidade)" required onChange={handleInputChange} className="w-full p-2 border rounded" />
+                </>
+              )}
+              {modalType === 'sensor' && (
+                <>
+                  <input name="modelo" placeholder="Modelo (Ex: PN5180)" required onChange={handleInputChange} className="w-full p-2 border rounded" />
+                  <input name="ip" placeholder="IP (Ex: 192.168.0.10)" required onChange={handleInputChange} className="w-full p-2 border rounded" />
+                  <select name="local_id" required onChange={handleInputChange} className="w-full p-2 border rounded">
+                    <option value="">Selecione a Câmara...</option>
+                    {data.camaras.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                </>
+              )}
+              
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="secondary" onClick={() => setShowModal(false)} type="button">Cancelar</Button>
+                <Button variant="success" type="submit">Salvar</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
