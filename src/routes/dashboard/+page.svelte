@@ -1,12 +1,9 @@
 <script lang="ts">
-	import { Card } from 'flowbite-svelte';
 	import {
 		DatabaseOutline,
 		BarcodeOutline,
 		VideoCameraOutline,
-		TruckOutline
-	} from 'flowbite-svelte-icons';
-	import {
+		TruckOutline,
 		Table,
 		TableBody,
 		TableBodyCell,
@@ -14,7 +11,8 @@
 		TableHead,
 		TableHeadCell,
 		Checkbox
-	} from 'flowbite-svelte';
+	} from '$lib/uicomponents.js';
+	import Card from '$lib/components/Card.svelte';
 </script>
 
 <div class="main-content p-8">
@@ -24,7 +22,7 @@
 	</div>
 
 	<div class="mt-8 mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
-		<Card data-variant="Up" class="p-4">
+		<Card data-variant="Up">
 			<div class="flex items-center justify-between">
 				<div class="card-content">
 					<div class="cardtitle">
@@ -32,39 +30,19 @@
 					</div>
 					<div class="content">
 						<div><span class="amount_span">3</span></div>
-						<div class="info">
-							<div class="type-card">
-								<span class="typecard_span">Total de produtos no banco de dados</span>
-							</div>
-						</div>
 					</div>
 				</div>
-				<div data-color="Green" data-size="2xl" data-type="Circle" class="icon-shape bg-orange-100">
+				<div class="icon-shape bg-orange-100">
 					<DatabaseOutline class="w-16 text-orange-900 transition duration-75 dark:text-gray-400" />
 				</div>
 			</div>
-		</Card>
-		<Card data-variant="Up" class="p-4">
-			<div class="flex items-center justify-between">
-				<div class="card-content">
-					<div class="cardtitle">
-						<span class="cardtitle_span">Sensores ativos</span>
-					</div>
-					<div class="content">
-						<div><span class="amount_span">2</span></div>
-						<div class="info">
-							<div class="type-card">
-								<span class="typecard_span">Sensores ativos em todas as câmaras</span>
-							</div>
-						</div>
-					</div>
-				</div>
-				<div data-color="Green" data-size="2xl" data-type="Circle" class="icon-shape bg-orange-100">
-					<BarcodeOutline class="w-16 text-orange-900 transition duration-75 dark:text-gray-400" />
+			<div class="info">
+				<div class="type-card">
+					<span class="typecard_span">Total de produtos no banco de dados</span>
 				</div>
 			</div>
 		</Card>
-		<Card data-variant="Up" class="p-4">
+		<Card data-variant="Up">
 			<div class="flex items-center justify-between">
 				<div class="card-content">
 					<div class="cardtitle">
@@ -72,21 +50,41 @@
 					</div>
 					<div class="content">
 						<div><span class="amount_span">2</span></div>
-						<div class="info">
-							<div class="type-card">
-								<span class="typecard_span">Câmaras monitoradas</span>
-							</div>
-						</div>
 					</div>
 				</div>
-				<div data-color="Green" data-size="2xl" data-type="Circle" class="icon-shape bg-orange-100">
+				<div class="icon-shape bg-orange-100">
+					<BarcodeOutline class="w-16 text-orange-900 transition duration-75 dark:text-gray-400" />
+				</div>
+			</div>
+			<div class="info">
+				<div class="type-card">
+					<span class="typecard_span">Sensores ativos em todas as câmaras</span>
+				</div>
+			</div>
+		</Card>
+		<Card data-variant="Up">
+			<div class="flex items-center justify-between">
+				<div class="card-content">
+					<div class="cardtitle">
+						<span class="cardtitle_span">Sensores ativos</span>
+					</div>
+					<div class="content">
+						<div><span class="amount_span">2</span></div>
+					</div>
+				</div>
+				<div class="icon-shape bg-orange-100">
 					<VideoCameraOutline
 						class="w-16 text-orange-900 transition duration-75 dark:text-gray-400"
 					/>
 				</div>
 			</div>
+			<div class="info">
+				<div class="type-card">
+					<span class="typecard_span">Câmaras monitoradas</span>
+				</div>
+			</div>
 		</Card>
-		<Card data-variant="Up" class="p-4">
+		<Card data-variant="Up">
 			<div class="flex items-center justify-between">
 				<div class="card-content">
 					<div class="cardtitle">
@@ -94,21 +92,21 @@
 					</div>
 					<div class="content">
 						<div><span class="amount_span">2</span></div>
-						<div class="info">
-							<div class="type-card">
-								<span class="typecard_span">Sensores ativos em todas as câmaras</span>
-							</div>
-						</div>
 					</div>
 				</div>
-				<div data-color="Green" data-size="2xl" data-type="Circle" class="icon-shape bg-orange-100">
+				<div class="icon-shape bg-orange-100">
 					<TruckOutline class="w-16 text-orange-900 transition duration-75 dark:text-gray-400" />
+				</div>
+			</div>
+			<div class="info">
+				<div class="type-card">
+					<span class="typecard_span">Sensores ativos em todas as câmaras</span>
 				</div>
 			</div>
 		</Card>
 	</div>
 
-	<Table hoverable={true} shadow={true} class="bg-white dark:bg-gray-800">
+	<Table hoverable={true} divClass="overflow-hidden rounded-xl bg-white dark:bg-gray-800">
 		<caption
 			class="h1 bg-white p-4 text-left text-lg font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
 			>Últimas movimentações</caption
@@ -246,8 +244,8 @@
 		display: flex;
 	}
 	.icon-shape {
-		width: 64px;
-		height: 64px;
+		width: 48px;
+		height: 48px;
 		border-radius: 9999px;
 		justify-content: center;
 		align-items: center;
