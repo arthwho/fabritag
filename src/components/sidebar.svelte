@@ -15,6 +15,7 @@
 		EditSolid,
 		ChartPieOutline,
 		BuildingOutline,
+		HomeOutline,
 		ChartOutline,
 		TagOutline,
 		BarcodeOutline,
@@ -50,7 +51,7 @@
 	});
 </script>
 
-<Sidebar {activeUrl} class="h-full w-64" position="absolute">
+<Sidebar {activeUrl} class="h-full w-72" position="absolute">
 	<SidebarGroup>
 		<SidebarBrand {site} classes={{ img: 'w-32' }} />
 		<SidebarItem label="Dashboard" href="/dashboard" {spanClass} {activeClass} {nonActiveClass}>
@@ -66,8 +67,27 @@
 					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
 				/>
 			{/snippet}
-			<SidebarItem label="Armazéns" href="/ambientes/armazens" />
-			<SidebarItem label="Blocos" href="/ambientes/blocos" />
+			<SidebarItem label="Armazens" href="/armazens" {spanClass} {activeClass} {nonActiveClass}>
+				{#snippet icon()}
+					<HomeOutline
+						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+					/>
+				{/snippet}
+			</SidebarItem>
+			<SidebarItem label="Blocos" href="/blocos" {spanClass} {activeClass} {nonActiveClass}>
+				{#snippet icon()}
+					<BuildingOutline
+						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+					/>
+				{/snippet}
+			</SidebarItem>
+			<SidebarItem label="Sensores" href="/sensores" {spanClass} {activeClass} {nonActiveClass}>
+				{#snippet icon()}
+					<BarcodeOutline
+						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+					/>
+				{/snippet}
+			</SidebarItem>
 		</SidebarDropdownWrapper>
 		<SidebarItem label="Relatórios" href="/relatorios" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
@@ -83,13 +103,6 @@
 				/>
 			{/snippet}
 		</SidebarItem>
-		<SidebarItem label="Sensores" href="/sensores" {spanClass} {activeClass} {nonActiveClass}>
-			{#snippet icon()}
-				<BarcodeOutline
-					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-				/>
-			{/snippet}
-		</SidebarItem>
 		<SidebarItem label="Usuários" href="/usuarios" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
 				<UsersGroupOutline
@@ -98,4 +111,42 @@
 			{/snippet}
 		</SidebarItem>
 	</SidebarGroup>
+	<SidebarGroup border>
+		<SidebarItem label="Suporte" href="/suporte" {spanClass} {activeClass} {nonActiveClass}>
+			{#snippet icon()}
+				<UserHeadsetOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem>
+		<SidebarItem label="Docs" href="/docs" {spanClass} {activeClass} {nonActiveClass}>
+			{#snippet icon()}
+				<BookOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem>
+		<SidebarItem label="Ajuda" href="/ajuda" {spanClass} {activeClass} {nonActiveClass}>
+			{#snippet icon()}
+				<LifeSaverOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem>
+	</SidebarGroup>
+	<SidebarGroup border
+		><SidebarItem
+			label="Movimentar lote"
+			href="/movimentacao"
+			{spanClass}
+			{activeClass}
+			{nonActiveClass}
+		>
+			{#snippet icon()}
+				<LifeSaverOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem></SidebarGroup
+	>
 </Sidebar>
