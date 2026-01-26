@@ -6,6 +6,7 @@ export {
   Dropdown,
   Input,
   Label,
+  Select,
   Table,
   TableBody,
   TableBodyCell,

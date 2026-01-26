@@ -13,6 +13,8 @@
 		Checkbox
 	} from '$lib/uicomponents.js';
 	import Card from '$lib/components/Card.svelte';
+	export let data;
+	$: dashboard = data.dashboard;
 </script>
 
 <div class="main-content p-8">
@@ -20,6 +22,11 @@
 		<h1>Monitoramento de Produção</h1>
 		<p>Visão em tempo real do fluxo de itens e análise de eficiência da linha.</p>
 	</div>
+	{#if data.error}
+		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
+			{data.error}
+		</div>
+	{/if}
 
 	<div class="mt-8 mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
 		<Card data-variant="Up">
@@ -29,7 +36,9 @@
 						<span class="cardtitle_span">Total de produtos</span>
 					</div>
 					<div class="content">
-						<div><span class="amount_span">3</span></div>
+						<div>
+							<span class="amount_span">{dashboard.total_produtos}</span>
+						</div>
 					</div>
 				</div>
 				<div class="icon-shape bg-orange-100">
@@ -49,7 +58,9 @@
 						<span class="cardtitle_span">Sensores ativos</span>
 					</div>
 					<div class="content">
-						<div><span class="amount_span">2</span></div>
+						<div>
+							<span class="amount_span">{dashboard.total_sensores}</span>
+						</div>
 					</div>
 				</div>
 				<div class="icon-shape bg-orange-100">
@@ -66,10 +77,12 @@
 			<div class="flex items-center justify-between">
 				<div class="card-content">
 					<div class="cardtitle">
-						<span class="cardtitle_span">Sensores ativos</span>
+						<span class="cardtitle_span">Câmaras monitoradas</span>
 					</div>
 					<div class="content">
-						<div><span class="amount_span">2</span></div>
+						<div>
+							<span class="amount_span">{dashboard.total_camaras}</span>
+						</div>
 					</div>
 				</div>
 				<div class="icon-shape bg-orange-100">
@@ -91,7 +104,9 @@
 						<span class="cardtitle_span">Movimentações hoje</span>
 					</div>
 					<div class="content">
-						<div><span class="amount_span">2</span></div>
+						<div>
+							<span class="amount_span">{dashboard.ultimas_movimentacoes.length}</span>
+						</div>
 					</div>
 				</div>
 				<div class="icon-shape bg-orange-100">
@@ -100,7 +115,7 @@
 			</div>
 			<div class="info">
 				<div class="type-card">
-					<span class="typecard_span">Sensores ativos em todas as câmaras</span>
+					<span class="typecard_span">Total de movimentações nas últimas 24h</span>
 				</div>
 			</div>
 		</Card>
@@ -109,66 +124,26 @@
 	<Table hoverable={true} divClass="overflow-hidden rounded-xl bg-white dark:bg-gray-800">
 		<caption
 			class="h1 bg-white p-4 text-left text-lg font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
-			>Últimas movimentações</caption
 		>
+			Últimas movimentações
+		</caption>
 		<TableHead>
-			<TableHeadCell class="p-4!">
-				<Checkbox />
-			</TableHeadCell>
+			<TableHeadCell class="p-4!"><Checkbox /></TableHeadCell>
 			<TableHeadCell>Produto</TableHeadCell>
 			<TableHeadCell>Origem</TableHeadCell>
 			<TableHeadCell>Destino</TableHeadCell>
 			<TableHeadCell>Data/Hora</TableHeadCell>
-			<TableHeadCell>
-				<span class="sr-only">Edit</span>
-			</TableHeadCell>
 		</TableHead>
 		<TableBody>
-			<TableBodyRow>
-				<TableBodyCell class="p-4!">
-					<Checkbox />
-				</TableBodyCell>
-				<TableBodyCell>Apple MacBook Pro 17"</TableBodyCell>
-				<TableBodyCell>Silver</TableBodyCell>
-				<TableBodyCell>Laptop</TableBodyCell>
-				<TableBodyCell>$2999</TableBodyCell>
-				<TableBodyCell>
-					<a
-						href="/tables"
-						class="text-primary-600 dark:text-primary-500 font-medium hover:underline">Edit</a
-					>
-				</TableBodyCell>
-			</TableBodyRow>
-			<TableBodyRow>
-				<TableBodyCell class="p-4!">
-					<Checkbox />
-				</TableBodyCell>
-				<TableBodyCell>Microsoft Surface Pro</TableBodyCell>
-				<TableBodyCell>White</TableBodyCell>
-				<TableBodyCell>Laptop PC</TableBodyCell>
-				<TableBodyCell>$1999</TableBodyCell>
-				<TableBodyCell>
-					<a
-						href="/tables"
-						class="text-primary-600 dark:text-primary-500 font-medium hover:underline">Edit</a
-					>
-				</TableBodyCell>
-			</TableBodyRow>
-			<TableBodyRow>
-				<TableBodyCell class="p-4!">
-					<Checkbox />
-				</TableBodyCell>
-				<TableBodyCell>Magic Mouse 2</TableBodyCell>
-				<TableBodyCell>Black</TableBodyCell>
-				<TableBodyCell>Accessories</TableBodyCell>
-				<TableBodyCell>$99</TableBodyCell>
-				<TableBodyCell>
-					<a
-						href="/tables"
-						class="text-primary-600 dark:text-primary-500 font-medium hover:underline">Edit</a
-					>
-				</TableBodyCell>
-			</TableBodyRow>
+			{#each dashboard.ultimas_movimentacoes as movimentacao}
+				<TableBodyRow>
+					<TableBodyCell class="p-4!"><Checkbox /></TableBodyCell>
+					<TableBodyCell>{movimentacao.produto}</TableBodyCell>
+					<TableBodyCell>{movimentacao.origem}</TableBodyCell>
+					<TableBodyCell>{movimentacao.destino}</TableBodyCell>
+					<TableBodyCell>{movimentacao.data}</TableBodyCell>
+				</TableBodyRow>
+			{/each}
 		</TableBody>
 	</Table>
 </div>

@@ -5,7 +5,10 @@ from datetime import datetime
 
 # --- CONFIGURAÇÃO ---
 app = Flask(__name__)
-DB_FILE = 'fabritag_db.json'
+# Aponta para o 'fabritag_db.json' na raiz do projeto
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', '..'))
+DB_FILE = os.path.join(PROJECT_ROOT, 'fabritag_db.json')
 
 # --- FUNÇÕES AUXILIARES DE BANCO DE DADOS (JSON) ---
 
@@ -66,6 +69,11 @@ def manage_products():
         return jsonify({"message": "Produto criado com sucesso", "produto": novo_produto}), 201
         
     return jsonify(db['produtos'])
+
+@app.route('/api/camaras', methods=['GET'])
+def get_camaras():
+    db = load_db()
+    return jsonify(db['camaras'])
 
 # --- SENSORES & INFRA ---
 
