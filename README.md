@@ -1,38 +1,52 @@
-# sv
+# FABRITAG
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Monorepo/workspace do projeto FABRITAG com:
+- Frontend em SvelteKit (`src/routes`, `src/components`, `src/lib/components`)
+- Backend Flask + PostgreSQL (`src/lib/server`)
+- Firmware para leitura RFID (ESP32 + PN5180) (`sketch_feb28a`)
+- Documentação e artefatos auxiliares (`docs`, `fabritag_db.json`)
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Como rodar (resumo)
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+pnpm install
+pnpm dev
 ```
 
-## Building
+Para o backend Python (API Flask), use os arquivos em `src/lib/server` e configure variáveis de ambiente para o banco PostgreSQL.
 
-To create a production version of your app:
+## Estrutura de pastas
 
-```sh
-npm run build
+```text
+fabritag/
+├─ docs/                                   # Documentação do projeto (PDFs e materiais de apoio)
+│  └─ fabritag_IC.pdf
+├─ firmware/                          # Firmware do leitor RFID em ESP32/PN5180
+│  └─ firmware.ino
+├─ src/                                    # Código-fonte principal do frontend e integração
+│  ├─ components/                          # Componentes de interface de uso geral
+│  ├─ lib/                                 # Biblioteca compartilhada (assets, UI e backend Python)
+│  │  ├─ assets/                           # Ícones e imagens usados no app
+│  │  ├─ components/                       # Componentes reutilizáveis (Card, Container)
+│  │  └─ server/                           # Backend Flask, schema SQL e dependências Python
+│  ├─ routes/                              # Rotas/páginas do SvelteKit
+│  │  ├─ dashboard/                        # Página de visão geral e métricas
+│  │  ├─ infraestrutura/                   # Páginas de infraestrutura (armazéns, blocos, sensores)
+│  │  └─ movimentacao/                     # Página e lógica de movimentações
+│  ├─ app.css
+│  └─ app.html
+├─ static/                                 # Arquivos estáticos servidos diretamente
+│  └─ robots.txt
+├─ fabritag_db.json                        # Base/fixture local em JSON para testes/dados
+├─ jsconfig.json
+├─ package.json
+├─ pnpm-lock.yaml
+├─ pnpm-workspace.yaml
+├─ svelte.config.js
+└─ vite.config.js
 ```
 
-You can preview the production build with `npm run preview`.
+## Observações
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- Pastas de ambiente/ferramenta como `.git`, `.venv`, `.svelte-kit` e `node_modules` não fazem parte da estrutura funcional do código-fonte.
+- O frontend usa rotas do SvelteKit em `src/routes` e integra com a API do backend.
