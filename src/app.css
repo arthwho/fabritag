@@ -1,6 +1,73 @@
 @import 'tailwindcss';
 @plugin 'flowbite/plugin';
 @custom-variant dark (&:where(.dark, .dark *));
-/* ... */
 @source '../node_modules/flowbite-svelte/dist';
 @source '../node_modules/flowbite-svelte-icons/dist';
+
+@theme {
+	/* Global brand palette used by Flowbite `color="primary"` utilities */
+	--color-primary-50: #fff7ed;
+	--color-primary-100: #ffedd5;
+	--color-primary-200: #fed7aa;
+	--color-primary-300: #fdba74;
+	--color-primary-400: #fb923c;
+	--color-primary-500: #f97316;
+	--color-primary-600: #ea580c;
+	--color-primary-700: #c2410c;
+	--color-primary-800: #9a3412;
+	--color-primary-900: #7c2d12;
+}
+
+@layer components {
+	/* Flowbite Button base classes: global standardization */
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium {
+		@apply rounded-xl font-semibold transition-colors duration-150;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium:focus-visible {
+		@apply outline-hidden ring-2 ring-primary-300 ring-offset-2;
+	}
+
+	/* Keep all primary buttons aligned with brand tone */
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='bg-primary-'] {
+		background-color: var(--color-primary-600) !important;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='bg-primary-']:hover {
+		background-color: var(--color-primary-700) !important;
+	}
+
+	/* Many screens still use `color="orange"` in Flowbite. Keep it on brand globally. */
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='bg-orange-'] {
+		background-color: var(--color-primary-600) !important;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='bg-orange-']:hover {
+		background-color: var(--color-primary-700) !important;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='text-orange-'][class*='border-orange-'] {
+		color: var(--color-primary-600) !important;
+		border-color: var(--color-primary-600) !important;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='text-orange-'][class*='border-orange-']:hover {
+		color: #fff !important;
+		background-color: var(--color-primary-700) !important;
+		border-color: var(--color-primary-700) !important;
+	}
+
+	/* Inactive/neutral Flowbite buttons (usually `color="dark"` + `outline`) */
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='border-gray-800'][class*='text-gray-900'] {
+		border-color: #d1d5dc !important;
+		color: #6b7280 !important;
+		background-color: #fbf9fa !important;
+	}
+
+	:is(button, a).inline-flex.items-center.justify-center.text-center.font-medium[class*='border-gray-800'][class*='text-gray-900']:hover {
+		border-color: #9ca3af !important;
+		color: #4b5563 !important;
+		background-color: #f9fafb !important;
+	}
+    
+}

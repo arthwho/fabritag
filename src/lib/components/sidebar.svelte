@@ -44,6 +44,26 @@
 			{/snippet}
 		</SidebarItem>
 		<SidebarItem
+			label="Infraestrutura"
+			href="/infraestrutura"
+			{spanClass}
+			{activeClass}
+			{nonActiveClass}
+		>
+			{#snippet icon()}
+				<BuildingOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem>
+		<SidebarItem label="Produtos" href="/produtos" {spanClass} {activeClass} {nonActiveClass}>
+			{#snippet icon()}
+				<TagOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem>
+		<SidebarItem
 			label="Movimentar lote"
 			href="/movimentacao"
 			{spanClass}
@@ -56,44 +76,9 @@
 				/>
 			{/snippet}
 		</SidebarItem>
-		<SidebarDropdownWrapper label="Infraestrutura" classes={{ btn: 'p-2' }}>
-			{#snippet icon()}
-				<BuildingOutline
-					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-				/>
-			{/snippet}
-			<SidebarItem label="Armazens" href="/infraestrutura/armazens" {spanClass} {activeClass} {nonActiveClass}>
-				{#snippet icon()}
-					<HomeOutline
-						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-					/>
-				{/snippet}
-			</SidebarItem>
-			<SidebarItem label="Blocos" href="/infraestrutura/blocos" {spanClass} {activeClass} {nonActiveClass}>
-				{#snippet icon()}
-					<BuildingOutline
-						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-					/>
-				{/snippet}
-			</SidebarItem>
-			<SidebarItem label="Sensores" href="/infraestrutura/sensores" {spanClass} {activeClass} {nonActiveClass}>
-				{#snippet icon()}
-					<BarcodeOutline
-						class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-					/>
-				{/snippet}
-			</SidebarItem>
-		</SidebarDropdownWrapper>
 		<SidebarItem label="Relatórios" href="/relatorios" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
 				<ChartOutline
-					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-				/>
-			{/snippet}
-		</SidebarItem>
-		<SidebarItem label="Produtos" href="/produtos" {spanClass} {activeClass} {nonActiveClass}>
-			{#snippet icon()}
-				<TagOutline
 					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
 				/>
 			{/snippet}

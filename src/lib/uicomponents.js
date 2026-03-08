@@ -1,5 +1,6 @@
 export {
   A,
+  Badge,
   Button,
   Card,
   Checkbox,
@@ -13,12 +14,25 @@ export {
   TableBodyRow,
   TableHead,
   TableHeadCell,
+  TableSearch,
+  DropdownItem,
+  DropdownDivider,
+  DropdownHeader,
+  Tabs,
+  TabItem,
+  Modal,
+  Datepicker,
 } from 'flowbite-svelte';
 
 export {
   BarcodeOutline,
   ChevronDownOutline,
   DatabaseOutline,
+  EditOutline,
+  PlusOutline,
   TruckOutline,
   VideoCameraOutline,
+  FilterOutline,
+  TrashBinOutline,
+  ChevronLeftOutline,
 } from 'flowbite-svelte-icons';

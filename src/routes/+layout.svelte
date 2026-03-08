@@ -1,7 +1,7 @@
 <script>
-	import './layout.css';
+	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import Sidebar from '../components/sidebar.svelte';
+	import Sidebar from '../lib/components/sidebar.svelte';
 
 	let { children } = $props();
 </script>

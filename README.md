@@ -37,7 +37,6 @@ fabritag/
 │  └─ app.html
 ├─ static/                                 # Arquivos estáticos servidos diretamente
 │  └─ robots.txt
-├─ fabritag_db.json                        # Base/fixture local em JSON para testes/dados
 ├─ jsconfig.json
 ├─ package.json
 ├─ pnpm-lock.yaml
