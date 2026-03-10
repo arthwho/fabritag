@@ -8,16 +8,10 @@
 		Checkbox,
 		TableSearch,
 		Button,
-		PlusOutline,
-		ChevronDownOutline,
-		TrashBinOutline,
-		Dropdown,
-		DropdownItem,
-		DropdownDivider,
-		DropdownHeader,
-		EditOutline
+		PlusOutline
 	} from '$lib/uicomponents.js';
 	import TableActions from '$lib/components/TableActions.svelte';
+	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
 	type PredioRow = {
 		id: number;
@@ -30,12 +24,14 @@
 		filteredPredios = [],
 		searchTermPredios = $bindable(''),
 		onOpenModal,
-		onEditPredio
+		onEditPredio,
+		onDeletePredio
 	}: {
 		filteredPredios?: PredioRow[];
 		searchTermPredios?: string;
 		onOpenModal: () => void;
-		onEditPredio: (predioId: number) => void;
+		onEditPredio: (predioId: number) => void | Promise<void>;
+		onDeletePredio: (predioId: number) => void | Promise<void>;
 	} = $props();
 </script>
 
@@ -78,19 +74,12 @@
 				<TableBodyCell>{predio.endereco}</TableBodyCell>
 				<TableBodyCell>{predio.total_camaras}</TableBodyCell>
 				<TableBodyCell class="flex gap-2">
-					<Button id={`predio-actions-button-${predio.id}`} outline color="dark" size="xs"
-						>Ações <ChevronDownOutline class="ml-1 h-4 w-4" /></Button
-					>
-					<Dropdown triggeredBy={`#predio-actions-button-${predio.id}`}>
-						<DropdownHeader>Ações do prédio</DropdownHeader>
-						<DropdownItem onclick={() => onEditPredio(predio.id)}>
-							<EditOutline class="mr-2 h-4 w-4" />Editar
-						</DropdownItem>
-						<DropdownDivider />
-						<DropdownItem class="text-red-600">
-							<TrashBinOutline class="mr-2 h-4 w-4" />Excluir
-						</DropdownItem>
-					</Dropdown>
+					<RowActionsMenu
+						menuId={`predio-actions-button-${predio.id}`}
+						headerLabel="Ações do prédio"
+						onEdit={() => onEditPredio(predio.id)}
+						onDelete={() => onDeletePredio(predio.id)}
+					/>
 				</TableBodyCell>
 			</TableBodyRow>
 		{:else}

@@ -17,6 +17,12 @@
 		isSensorModalOpen = $bindable(false),
 		isSubmitting = false,
 		formError = '',
+		predioModalTitle = 'Adicionar Prédio',
+		camaraModalTitle = 'Adicionar Câmara',
+		sensorModalTitle = 'Adicionar Sensor',
+		predioSubmitLabel = 'Salvar',
+		camaraSubmitLabel = 'Salvar',
+		sensorSubmitLabel = 'Salvar',
 		predioNome = $bindable(''),
 		predioEndereco = $bindable(''),
 		camaraPredioId = $bindable(''),
@@ -28,15 +34,21 @@
 		sensorAtivo = $bindable(true),
 		predios = [],
 		camaras = [],
-		onCreatePredio,
-		onCreateCamara,
-		onCreateSensor
+		onSubmitPredio,
+		onSubmitCamara,
+		onSubmitSensor
 	}: {
 		isPredioModalOpen?: boolean;
 		isCamaraModalOpen?: boolean;
 		isSensorModalOpen?: boolean;
 		isSubmitting?: boolean;
 		formError?: string;
+		predioModalTitle?: string;
+		camaraModalTitle?: string;
+		sensorModalTitle?: string;
+		predioSubmitLabel?: string;
+		camaraSubmitLabel?: string;
+		sensorSubmitLabel?: string;
 		predioNome?: string;
 		predioEndereco?: string;
 		camaraPredioId?: string;
@@ -48,14 +60,14 @@
 		sensorAtivo?: boolean;
 		predios?: PredioOption[];
 		camaras?: CamaraOption[];
-		onCreatePredio: (event: SubmitEvent) => Promise<void>;
-		onCreateCamara: (event: SubmitEvent) => Promise<void>;
-		onCreateSensor: (event: SubmitEvent) => Promise<void>;
+		onSubmitPredio: (event: SubmitEvent) => Promise<void>;
+		onSubmitCamara: (event: SubmitEvent) => Promise<void>;
+		onSubmitSensor: (event: SubmitEvent) => Promise<void>;
 	} = $props();
 </script>
 
-<Modal bind:open={isPredioModalOpen} title="Adicionar Prédio" size="md">
-	<form class="space-y-4" onsubmit={onCreatePredio}>
+<Modal bind:open={isPredioModalOpen} title={predioModalTitle} size="md">
+	<form class="space-y-4" onsubmit={onSubmitPredio}>
 		<div>
 			<Label for="predio-nome">Nome</Label>
 			<Input id="predio-nome" bind:value={predioNome} required />
@@ -71,13 +83,13 @@
 			<Button type="button" color="light" onclick={() => (isPredioModalOpen = false)}
 				>Cancelar</Button
 			>
-			<Button type="submit" color="orange" disabled={isSubmitting}>Salvar</Button>
+			<Button type="submit" color="orange" disabled={isSubmitting}>{predioSubmitLabel}</Button>
 		</div>
 	</form>
 </Modal>
 
-<Modal bind:open={isCamaraModalOpen} title="Adicionar Câmara" size="md">
-	<form class="space-y-4" onsubmit={onCreateCamara}>
+<Modal bind:open={isCamaraModalOpen} title={camaraModalTitle} size="md">
+	<form class="space-y-4" onsubmit={onSubmitCamara}>
 		<div>
 			<Label for="camara-predio">Prédio</Label>
 			<Select id="camara-predio" bind:value={camaraPredioId} required>
@@ -101,13 +113,13 @@
 			<Button type="button" color="light" onclick={() => (isCamaraModalOpen = false)}
 				>Cancelar</Button
 			>
-			<Button type="submit" color="orange" disabled={isSubmitting}>Salvar</Button>
+			<Button type="submit" color="orange" disabled={isSubmitting}>{camaraSubmitLabel}</Button>
 		</div>
 	</form>
 </Modal>
 
-<Modal bind:open={isSensorModalOpen} title="Adicionar Sensor" size="md">
-	<form class="space-y-4" onsubmit={onCreateSensor}>
+<Modal bind:open={isSensorModalOpen} title={sensorModalTitle} size="md">
+	<form class="space-y-4" onsubmit={onSubmitSensor}>
 		<div>
 			<Label for="sensor-camara">Câmara</Label>
 			<Select id="sensor-camara" bind:value={sensorCamaraId} required>
@@ -124,10 +136,6 @@
 			<Label for="sensor-ip">IP Address</Label>
 			<Input id="sensor-ip" bind:value={sensorIpAddress} placeholder="192.168.2.175" />
 		</div>
-		<div class="flex items-center gap-2">
-			<input id="sensor-ativo" type="checkbox" bind:checked={sensorAtivo} class="h-4 w-4" />
-			<Label for="sensor-ativo">Ativo</Label>
-		</div>
 		{#if formError}
 			<p class="text-sm text-red-600">{formError}</p>
 		{/if}
@@ -135,7 +143,7 @@
 			<Button type="button" color="light" onclick={() => (isSensorModalOpen = false)}
 				>Cancelar</Button
 			>
-			<Button type="submit" color="orange" disabled={isSubmitting}>Salvar</Button>
+			<Button type="submit" color="orange" disabled={isSubmitting}>{sensorSubmitLabel}</Button>
 		</div>
 	</form>
 </Modal>

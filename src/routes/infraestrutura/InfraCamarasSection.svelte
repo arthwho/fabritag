@@ -7,18 +7,11 @@
 		TableHeadCell,
 		Checkbox,
 		TableSearch,
-		Badge,
 		Button,
-		PlusOutline,
-		ChevronDownOutline,
-		TrashBinOutline,
-		Dropdown,
-		DropdownItem,
-		DropdownDivider,
-		DropdownHeader,
-		EditOutline
+		PlusOutline
 	} from '$lib/uicomponents.js';
 	import TableActions from '$lib/components/TableActions.svelte';
+	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
 	type CamaraRow = {
 		id: number;
@@ -33,12 +26,14 @@
 		filteredCamaras = [],
 		searchTermCamaras = $bindable(''),
 		onOpenModal,
-		onEditCamara
+		onEditCamara,
+		onDeleteCamara
 	}: {
 		filteredCamaras?: CamaraRow[];
 		searchTermCamaras?: string;
 		onOpenModal: () => void;
-		onEditCamara: (camaraId: number) => void;
+		onEditCamara: (camaraId: number) => void | Promise<void>;
+		onDeleteCamara: (camaraId: number) => void | Promise<void>;
 	} = $props();
 </script>
 
@@ -71,7 +66,6 @@
 		<TableHeadCell>Prédio</TableHeadCell>
 		<TableHeadCell>Capacidade</TableHeadCell>
 		<TableHeadCell>Sensores</TableHeadCell>
-		<TableHeadCell>Status</TableHeadCell>
 		<TableHeadCell>Ações</TableHeadCell>
 	</TableHead>
 	<TableBody>
@@ -83,25 +77,13 @@
 				<TableBodyCell>{camara.predio}</TableBodyCell>
 				<TableBodyCell>{camara.capacidade_vagas}</TableBodyCell>
 				<TableBodyCell>{camara.total_sensores}</TableBodyCell>
-				<TableBodyCell>
-					<Badge border large color={camara.sensores_ativos > 0 ? 'green' : 'red'}>
-						{camara.sensores_ativos > 0 ? 'Ativa' : 'Inativa'}
-					</Badge>
-				</TableBodyCell>
 				<TableBodyCell class="flex gap-2">
-					<Button id={`camara-actions-button-${camara.id}`} outline color="dark" size="xs"
-						>Ações <ChevronDownOutline class="ml-1 h-4 w-4" /></Button
-					>
-					<Dropdown triggeredBy={`#camara-actions-button-${camara.id}`}>
-						<DropdownHeader>Ações da câmara</DropdownHeader>
-						<DropdownItem onclick={() => onEditCamara(camara.id)}>
-							<EditOutline class="mr-2 h-4 w-4" />Editar
-						</DropdownItem>
-						<DropdownDivider />
-						<DropdownItem class="text-red-600">
-							<TrashBinOutline class="mr-2 h-4 w-4" />Excluir
-						</DropdownItem>
-					</Dropdown>
+					<RowActionsMenu
+						menuId={`camara-actions-button-${camara.id}`}
+						headerLabel="Ações da câmara"
+						onEdit={() => onEditCamara(camara.id)}
+						onDelete={() => onDeleteCamara(camara.id)}
+					/>
 				</TableBodyCell>
 			</TableBodyRow>
 		{:else}

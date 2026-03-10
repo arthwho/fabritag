@@ -4,19 +4,26 @@
 		SidebarGroup,
 		SidebarItem,
 		SidebarBrand,
-		SidebarDropdownWrapper
+		SidebarDropdownWrapper,
+		Button,
+		Dropdown,
+		DropdownItem,
+		Avatar,
+		DropdownHeader,
+		DropdownGroup,
+		DropdownDivider
 	} from 'flowbite-svelte';
 	import {
 		ChartPieOutline,
 		BuildingOutline,
-		HomeOutline,
-		ChartOutline,
 		TagOutline,
-		BarcodeOutline,
 		UsersGroupOutline,
 		UserHeadsetOutline,
 		BookOutline,
-		LifeSaverOutline
+		LifeSaverOutline,
+		ArrowRightToBracketOutline,
+		AdjustmentsHorizontalOutline,
+		UserOutline
 	} from 'flowbite-svelte-icons';
 	import { ArrowRightLeft } from 'lucide-svelte';
 	import { page } from '$app/stores';
@@ -33,7 +40,12 @@
 		'flex items-center p-2 text-base font-normal text-black-900 rounded-lg dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700';
 </script>
 
-<Sidebar activeUrl={$page.url.pathname} class="h-full w-72" position="absolute">
+<Sidebar
+	activeUrl={$page.url.pathname}
+	class="h-screen w-72"
+	divClass="h-full flex flex-col"
+	position="fixed"
+>
 	<SidebarGroup>
 		<SidebarBrand {site} classes={{ img: 'w-32' }} />
 		<SidebarItem label="Dashboard" href="/dashboard" {spanClass} {activeClass} {nonActiveClass}>
@@ -63,6 +75,18 @@
 				/>
 			{/snippet}
 		</SidebarItem>
+		<!-- <SidebarItem label="Relatórios" href="/relatorios" {spanClass} {activeClass} {nonActiveClass}>
+			{#snippet icon()}
+				<ChartOutline
+					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
+				/>
+			{/snippet}
+		</SidebarItem> -->
+	</SidebarGroup>
+	<SidebarGroup
+		border
+		borderClass="space-y-2 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700"
+	>
 		<SidebarItem
 			label="Movimentar lote"
 			href="/movimentacao"
@@ -76,13 +100,6 @@
 				/>
 			{/snippet}
 		</SidebarItem>
-		<SidebarItem label="Relatórios" href="/relatorios" {spanClass} {activeClass} {nonActiveClass}>
-			{#snippet icon()}
-				<ChartOutline
-					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
-				/>
-			{/snippet}
-		</SidebarItem>
 		<SidebarItem label="Usuários" href="/usuarios" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
 				<UsersGroupOutline
@@ -91,7 +108,10 @@
 			{/snippet}
 		</SidebarItem>
 	</SidebarGroup>
-	<SidebarGroup border>
+	<SidebarGroup
+		border
+		borderClass="space-y-2 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700"
+	>
 		<SidebarItem label="Suporte" href="/suporte" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
 				<UserHeadsetOutline
@@ -114,4 +134,24 @@
 			{/snippet}
 		</SidebarItem>
 	</SidebarGroup>
+	<div class="mt-auto mb-4 pt-6">
+		<Button class="w-full" color="light" size="sm" id="user-dropdown">
+			<div class="flex w-full items-center gap-2 text-left">
+				<Avatar />
+				<div class="leading-tight">
+					<span class="block font-medium">Admin</span>
+					<span class="block text-xs text-gray-500">admin@fabritag.com</span>
+				</div>
+			</div>
+		</Button>
+	</div>
+	<Dropdown triggeredBy="#user-dropdown" placement="top-start">
+		<DropdownItem class="flex items-center gap-2"><UserOutline />Conta</DropdownItem>
+		<DropdownItem class="flex items-center gap-2" href="/settings">
+			<AdjustmentsHorizontalOutline />Configurações</DropdownItem
+		>
+		<DropdownItem class="flex items-center gap-2 text-red-600"
+			><ArrowRightToBracketOutline />Sair</DropdownItem
+		>
+	</Dropdown>
 </Sidebar>

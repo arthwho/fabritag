@@ -22,6 +22,7 @@ export {
   TabItem,
   Modal,
   Datepicker,
+  Alert
 } from 'flowbite-svelte';
 
 export {
@@ -35,4 +36,5 @@ export {
   FilterOutline,
   TrashBinOutline,
   ChevronLeftOutline,
+  InfoCircleSolid
 } from 'flowbite-svelte-icons';

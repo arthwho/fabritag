@@ -19,7 +19,7 @@ async function fetchFromBackend(fetch, endpoint) {
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ fetch }) {
 	const [produtosResponse, camarasResponse] = await Promise.all([
-		fetchFromBackend(fetch, 'produtos'),
+		fetchFromBackend(fetch, 'batches'),
 		fetchFromBackend(fetch, 'camaras')
 	]);
 

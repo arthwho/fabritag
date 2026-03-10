@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		TableBody,
 		TableBodyCell,
@@ -9,16 +10,12 @@
 		TableSearch,
 		Badge,
 		Button,
-		PlusOutline,
-		ChevronDownOutline,
-		TrashBinOutline,
-		Dropdown,
-		DropdownItem,
-		DropdownDivider,
-		DropdownHeader,
-		EditOutline
+		PlusOutline
 	} from '$lib/uicomponents.js';
 	import TableActions from '$lib/components/TableActions.svelte';
+	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
+
+	import { sensorStore } from '$lib/sensors.svelte.js';
 
 	type SensorRow = {
 		id: number;
@@ -31,14 +28,38 @@
 	let {
 		filteredItems = [],
 		searchTerm = $bindable(''),
+		liveStatuses: initialLiveStatuses = {},
 		onOpenModal,
-		onEditSensor
+		onEditSensor,
+		onDeleteSensor
 	}: {
 		filteredItems?: SensorRow[];
 		searchTerm?: string;
+		liveStatuses?: Record<string, { status: string; ip_address: string }>;
 		onOpenModal: () => void;
-		onEditSensor: (sensorId: number) => void;
+		onEditSensor: (sensorId: number) => void | Promise<void>;
+		onDeleteSensor: (sensorId: number) => void | Promise<void>;
 	} = $props();
+
+	onMount(() => {
+		// Set initial state from server data to avoid "Offline" flicker
+		sensorStore.setInitial(initialLiveStatuses);
+
+		const stopPolling = sensorStore.startPolling();
+		return () => stopPolling;
+	});
+
+	function getStatus(sensor: SensorRow) {
+		const live = sensorStore.liveStatuses[sensor.id.toString()];
+		if (live) return live.status;
+		return 'Offline';
+	}
+
+	function getIP(sensor: SensorRow) {
+		const live = sensorStore.liveStatuses[sensor.id.toString()];
+		if (live && live.ip_address) return live.ip_address;
+		return sensor.ip || '-';
+	}
 </script>
 
 <div class="mb-4 flex items-center justify-between">
@@ -71,31 +92,25 @@
 	</TableHead>
 	<TableBody>
 		{#each filteredItems as sensor}
+			{@const currentStatus = getStatus(sensor)}
 			<TableBodyRow>
 				<TableBodyCell class="p-4!"><Checkbox /></TableBodyCell>
 				<TableBodyCell>{sensor.id}</TableBodyCell>
 				<TableBodyCell>{sensor.modelo}</TableBodyCell>
-				<TableBodyCell>{sensor.ip}</TableBodyCell>
+				<TableBodyCell>{getIP(sensor)}</TableBodyCell>
 				<TableBodyCell>{sensor.camara}</TableBodyCell>
 				<TableBodyCell>
-					<Badge border large color={sensor.status === 'Ativo' ? 'green' : 'red'}
-						>{sensor.status}</Badge
-					>
+					<Badge border large color={currentStatus === 'Online' ? 'green' : 'red'}>
+						{currentStatus}
+					</Badge>
 				</TableBodyCell>
 				<TableBodyCell class="flex gap-2">
-					<Button id={`sensor-actions-button-${sensor.id}`} outline color="dark" size="xs"
-						>Ações <ChevronDownOutline class="ml-1 h-4 w-4" /></Button
-					>
-					<Dropdown triggeredBy={`#sensor-actions-button-${sensor.id}`}>
-						<DropdownHeader>Ações do sensor</DropdownHeader>
-						<DropdownItem onclick={() => onEditSensor(sensor.id)}>
-							<EditOutline class="mr-2 h-4 w-4" />Editar
-						</DropdownItem>
-						<DropdownDivider />
-						<DropdownItem class="text-red-600">
-							<TrashBinOutline class="mr-2 h-4 w-4" />Excluir
-						</DropdownItem>
-					</Dropdown>
+					<RowActionsMenu
+						menuId={`sensor-actions-button-${sensor.id}`}
+						headerLabel="Ações do sensor"
+						onEdit={() => onEditSensor(sensor.id)}
+						onDelete={() => onDeleteSensor(sensor.id)}
+					/>
 				</TableBodyCell>
 			</TableBodyRow>
 		{:else}

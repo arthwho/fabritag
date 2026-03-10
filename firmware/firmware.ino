@@ -5,23 +5,34 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <WiFiManager.h> 
+#include <Preferences.h> 
 
 // --- DISPLAY CONFIGURATION ---
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-// Map the OLED to our new safe pins
-#define OLED_SDA 25
-#define OLED_SCL 26
-#define OLED_PWR 32 // Our custom power pin for the screen!
-
+#define OLED_RESET    -1 
+#define OLED_SDA      25
+#define OLED_SCL      26
+#define OLED_PWR      32 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- NETWORK CONFIGURATION ---
-const char *ssid = "404NOTFOUND";
-const char *password = "Batatinha123";
-const char *serverUrl = "http://192.168.2.174:5000/api/tag_event";
-const int sensorId = 1;
+// --- HARDWARE PINS ---
+#define LED_PIN       2  
+
+// --- NETWORK & API CONFIGURATION ---
+String serverUrl = "http://192.168.2.174:5000/api/tag_event"; 
+String sensorId = "1";                                        
+bool isWifiConnected = false;
+bool shouldSaveConfig = false; 
+
+// --- HEARTBEAT TIMER ---
+unsigned long previousPingMillis = 0;
+const unsigned long pingInterval = 10000; 
+
+// --- ADMIN RESET TAG ---
+// Replace this with the exact UID of the tag you want to use as a master reset key
+const String ADMIN_TAG_UID = "AB E0 68 06"; 
 
 // --- PN5180 CONFIGURATION ---
 #define PN5180_NSS 5
@@ -29,182 +40,156 @@ const int sensorId = 1;
 #define PN5180_RST 21
 PN5180ISO14443 nfc(PN5180_NSS, PN5180_BUSY, PN5180_RST);
 
+// --- STATE VARIABLES ---
 bool tagPresent = false;
 uint8_t currentUid[10];
 uint8_t currentUidLength = 0;
 int missCount = 0;
-int dotCounter = 0;
 
-// Helper function to update the OLED screen text easily
-void updateScreen(String line1, String line2 = "", String line3 = "")
-{
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println(line1);
-  if (line2 != "")
-    display.println(line2);
-  if (line3 != "")
-    display.println(line3);
-  display.display();
+// --- CUSTOM PORTAL CSS ---
+const char* customPortalCSS = 
+  "<title>Fabritag Manager</title>"
+  "<style>"
+  "button, input[type='button'], input[type='submit'] {"
+  "  background-color: #FF8C00 !important;"
+  "  border: none !important;"
+  "}"
+  "button:hover, input[type='button']:hover, input[type='submit']:hover {"
+  "  background-color: #E67E00 !important;"
+  "}"
+  "</style>";
+
+// --- GLOBAL WIFIMANAGER PARAMETERS ---
+WiFiManagerParameter custom_server_url("serverUrl", "Backend Server URL", "", 60);
+WiFiManagerParameter custom_sensor_id("sensorId", "Sensor ID", "", 10);
+
+// --- FUNCTION PROTOTYPES ---
+// Notice the default arguments (= "") are placed HERE!
+void updateScreen(String line1, String line2 = "", String line3 = "");
+void drawLoadingAnim(String headerText);
+void startLoading(String text);
+void stopLoading();
+void setupWiFi();
+void handleScreenSaver(); 
+void performServerHealthCheck();
+void sendTagEvent(String uid, String eventType);
+String uidToString(uint8_t *uid, uint8_t length);
+// ---------------------------
+
+void saveConfigCallback () {
+  Serial.println("User saved new settings in portal!");
+  shouldSaveConfig = true;
 }
 
-void setupWiFi()
-{
-  updateScreen("Connecting WiFi...", ssid);
-  Serial.print("Connecting to WiFi...");
-
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWiFi connected.");
-  updateScreen("WiFi Connected!", WiFi.localIP().toString());
-  delay(1500); // Hold the success message on screen for a moment
+void configModeCallback(WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  digitalWrite(LED_PIN, HIGH); 
+  updateScreen("WiFi Setup Mode", "Connect to Wifi:", myWiFiManager->getConfigPortalSSID());
 }
 
-void sendTagEvent(String uid, String event)
-{
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    updateScreen("Tag: " + uid, "Status: " + event, "Sending to DB...");
-
-    HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    String jsonPayload = "{\"epc_tag\": \"" + uid + "\", \"sensor_id\": " + String(sensorId) + ", \"event\": \"" + event + "\", \"rssi\": 0}";
-
-    int httpResponseCode = http.POST(jsonPayload);
-
-    if (httpResponseCode > 0)
-    {
-      Serial.println("HTTP Response code: " + String(httpResponseCode));
-      updateScreen("Tag: " + uid, "Status: " + event, "DB Sync: SUCCESS");
-    }
-    else
-    {
-      Serial.println("Error code: " + String(httpResponseCode));
-      updateScreen("Tag: " + uid, "Status: " + event, "DB Sync: FAILED");
-    }
-    http.end();
-  }
-  else
-  {
-    Serial.println("WiFi Disconnected");
-    updateScreen("WiFi Error!", "Cannot sync DB");
-  }
-}
-
-String uidToString(uint8_t *uid, uint8_t length)
-{
-  String s = "";
-  for (int i = 0; i < length; i++)
-  {
-    if (uid[i] < 0x10)
-      s += "0";
-    s += String(uid[i], HEX);
-  }
-  s.toUpperCase();
-  return s;
-}
-
-void setup()
-{
-  setCpuFrequencyMhz(80);
+void setup() {
+  handleScreenSaver();
+  setCpuFrequencyMhz(80); 
   Serial.begin(115200);
-
-  // 1. TURN ON THE SCREEN'S POWER FIRST
+  
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  
   pinMode(OLED_PWR, OUTPUT);
-  digitalWrite(OLED_PWR, HIGH);
-  delay(100); // Give the screen a moment to power up
-
-  // 2. INITIALIZE THE SCREEN ON THE NEW PINS
+  digitalWrite(OLED_PWR, HIGH); 
+  delay(100); 
+  
   Wire.begin(OLED_SDA, OLED_SCL);
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
-  {
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ; // Don't proceed, loop forever
+    for(;;); 
   }
-
+  
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  updateScreen("Booting System...");
-  delay(1000);
+// Spins the animation for 1 second (4 frames * 250ms)
+  for(int i = 0; i < 4; i++) {
+    drawLoadingAnim("Booting System...");
+    delay(250); 
+  }
+  setupWiFi();           
+  performServerHealthCheck(); // <-- Called right here!
 
-  // 3. START WIFI
-  setupWiFi();
-
-  // 4. START NFC
-  updateScreen("Starting NFC...");
+  startLoading("Starting NFC...");  // Starts the background spinner
   nfc.begin();
   nfc.reset();
   nfc.setupRF();
+  stopLoading();                    // Stops it smoothly when finished
 
-  Serial.println("Initialization complete. Bring your MIFARE tag near...");
-  updateScreen("System Ready", "Waiting for Tag...");
+  updateScreen("System Ready");
 }
 
-void loop()
-{
+void loop() {
+  handleScreenSaver();
+  // --- SVELTE DASHBOARD HEARTBEAT ---
+  if (isWifiConnected) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousPingMillis >= pingInterval) {
+      previousPingMillis = currentMillis;
+      
+      String pingUrl = serverUrl;
+      pingUrl.replace("tag_event", "sensor/ping"); 
+      
+      HTTPClient http;
+      http.begin(pingUrl);
+      http.addHeader("Content-Type", "application/json");
+      String jsonPayload = "{\"sensor_id\": " + sensorId + "}";
+      http.POST(jsonPayload);
+      http.end();
+    }
+  }
+
+  // --- NFC SCANNING LOGIC ---
   uint8_t uid[10];
   uint8_t uidLength = nfc.readCardSerial(uid);
 
-  if (uidLength > 0 && uid[0] != 0x00)
-  {
+  if (uidLength > 0 && uid[0] != 0x00) {
     missCount = 0;
 
-    if (!tagPresent)
-    {
+    if (!tagPresent) {
       tagPresent = true;
       currentUidLength = uidLength;
-      for (int i = 0; i < uidLength; i++)
-        currentUid[i] = uid[i];
-
+      
+      for (int i = 0; i < uidLength; i++) currentUid[i] = uid[i];
       String uidStr = uidToString(currentUid, currentUidLength);
-      Serial.println("\n>>> TAG ARRIVED! UID: " + uidStr);
-
-      // Sends HTTP request and updates screen
-      sendTagEvent(uidStr, "ARRIVED");
-    }
-    else
-    {
-      Serial.print("h");
-    }
-  }
-  else
-  {
-    if (tagPresent)
-    {
+      
+      // --- THE ADMIN TAG RESET INTERCEPTOR ---
+      if (uidStr == ADMIN_TAG_UID) {
+        Serial.println("ADMIN TAG DETECTED! Wiping Config...");
+        updateScreen("ADMIN TAG", "Resetting Device...");
+        digitalWrite(LED_PIN, HIGH);
+        delay(2000);
+        
+        WiFiManager wm;
+        wm.resetSettings(); 
+        ESP.restart();      
+      } else {
+        Serial.println("\n>>> TAG ARRIVED! UID: " + uidStr);
+        sendTagEvent(uidStr, "ARRIVED");
+      }
+    } 
+  } else {
+    if (tagPresent) {
       missCount++;
-      if (missCount >= 3)
-      {
-        tagPresent = false;
-
+      if (missCount >= 3) {
         String uidStr = uidToString(currentUid, currentUidLength);
-        Serial.println("\n<<< TAG REMOVED!");
-
-        // Sends HTTP request and updates screen
-        sendTagEvent(uidStr, "REMOVED");
-
-        delay(1000); // Let the user see the "Removed" message
+        
+        if (uidStr != ADMIN_TAG_UID) {
+          sendTagEvent(uidStr, "REMOVED");
+        }
+        
+        tagPresent = false;
         currentUidLength = 0;
+        
+        delay(1000); 
         updateScreen("System Ready", "Waiting for Tag...");
       }
-    }
-    else
-    {
-      // Background heartbeat
-      dotCounter++;
-      if (dotCounter >= 10)
-      {
-        Serial.print(".");
-        dotCounter = 0;
-      }
-    }
+    } 
   }
   delay(50);
 }

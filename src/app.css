@@ -69,5 +69,29 @@
 		color: #4b5563 !important;
 		background-color: #f9fafb !important;
 	}
+
+		h1,
+	.h1 {
+		font-size: 24px;
+		font-family: Inter;
+		font-weight: 700;
+		line-height: 34px;
+		word-wrap: break-word;
+	}
+	p {
+		color: var(--Text-Neutral-Neutral-900, #383e41);
+		font-size: 12px;
+		font-family: Inter;
+		font-weight: 400;
+		line-height: 18px;
+		word-wrap: break-word;
+	}
+
+	.header {
+		width: 100%;
+		justify-content: center;
+		display: flex;
+		flex-direction: column;
+	}
     
 }
