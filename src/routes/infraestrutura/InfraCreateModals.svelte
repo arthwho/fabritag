@@ -30,7 +30,6 @@
 		camaraCapacidade = $bindable(''),
 		sensorCamaraId = $bindable(''),
 		sensorModelo = $bindable('PN5180'),
-		sensorIpAddress = $bindable(''),
 		sensorAtivo = $bindable(true),
 		predios = [],
 		camaras = [],
@@ -56,7 +55,6 @@
 		camaraCapacidade?: string;
 		sensorCamaraId?: string;
 		sensorModelo?: string;
-		sensorIpAddress?: string;
 		sensorAtivo?: boolean;
 		predios?: PredioOption[];
 		camaras?: CamaraOption[];
@@ -131,10 +129,6 @@
 		<div>
 			<Label for="sensor-modelo">Modelo</Label>
 			<Input id="sensor-modelo" bind:value={sensorModelo} />
-		</div>
-		<div>
-			<Label for="sensor-ip">IP Address</Label>
-			<Input id="sensor-ip" bind:value={sensorIpAddress} placeholder="192.168.2.175" />
 		</div>
 		{#if formError}
 			<p class="text-sm text-red-600">{formError}</p>

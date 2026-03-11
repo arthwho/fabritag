@@ -149,7 +149,6 @@ def create_sensor():
     data = request.json or {}
     camara_id = data.get('camara_id')
     modelo = data.get('modelo', 'PN5180')
-    ip_address = data.get('ip_address')
     ativo = data.get('ativo', True)
 
     if camara_id is None:
@@ -159,7 +158,6 @@ def create_sensor():
         sensor = db.create_sensor(
             camara_id=camara_id,
             modelo=modelo,
-            ip_address=ip_address,
             ativo=ativo
         )
         return jsonify(sensor), 201
@@ -174,7 +172,6 @@ def update_sensor(sensor_id):
     data = request.json or {}
     camara_id = data.get('camara_id')
     modelo = data.get('modelo', 'PN5180')
-    ip_address = data.get('ip_address')
     ativo = data.get('ativo', True)
 
     if camara_id is None:
@@ -185,7 +182,6 @@ def update_sensor(sensor_id):
             sensor_id=sensor_id,
             camara_id=camara_id,
             modelo=modelo,
-            ip_address=ip_address,
             ativo=ativo
         )
         return jsonify(sensor), 200
@@ -251,47 +247,47 @@ def get_produtos():
 
 import time
 
-# Temporary dictionary to store live sensor statuses
+# Temporary dictionary to store live device statuses
 # In the future, this can be moved into your PostgreSQL db.
-live_sensors = {}
+live_devices = {}
 
-@app.route('/api/sensor/ping', methods=['POST'])
-def sensor_ping():
+@app.route('/api/dispositivos/ping', methods=['POST'])
+def dispositivo_ping():
     data = request.json or {}
-    sensor_id = data.get('sensor_id')
+    dispositivo_id = data.get('dispositivo_id')
     
     # Flask automatically grabs the IP of whatever device sent the request!
     ip_address = request.remote_addr 
     
-    if not sensor_id:
-        return jsonify({"error": "Missing sensor_id"}), 400
+    if not dispositivo_id:
+        return jsonify({"error": "Missing dispositivo_id"}), 400
 
     # Record the heartbeat timestamp and IP
-    live_sensors[str(sensor_id)] = {
+    live_devices[str(dispositivo_id)] = {
         "last_seen": time.time(),
         "ip_address": ip_address,
         "status": "Online"
     }
     return jsonify({"message": "Heartbeat acknowledged"}), 200
 
-@app.route('/api/sensor/status/<sensor_id>', methods=['GET'])
-def get_sensor_status(sensor_id):
-    sensor = live_sensors.get(str(sensor_id))
-    
-    if sensor:
+@app.route('/api/dispositivos/status/<dispositivo_id>', methods=['GET'])
+def get_dispositivo_status(dispositivo_id):
+    dispositivo = live_devices.get(str(dispositivo_id))
+
+    if dispositivo:
         # If we haven't heard from the ESP32 in over 15 seconds, consider it offline
-        if time.time() - sensor["last_seen"] > 15:
-            sensor["status"] = "Offline"
-        return jsonify(sensor), 200
+        if time.time() - dispositivo["last_seen"] > 15:
+            dispositivo["status"] = "Offline"
+        return jsonify(dispositivo), 200
         
     # If the sensor has never pinged the server since the server booted
     return jsonify({"status": "Unknown", "ip_address": "N/A"}), 404
 
-@app.route('/api/sensors/status', methods=['GET'])
-def get_all_sensor_statuses():
+@app.route('/api/dispositivos/status', methods=['GET'])
+def get_all_dispositivo_statuses():
     current_time = time.time()
     results = {}
-    for sid, info in live_sensors.items():
+    for sid, info in live_devices.items():
         status = info["status"]
         if current_time - info["last_seen"] > 15:
             status = "Offline"

@@ -162,7 +162,7 @@ def create_camara(predio_id, nome, capacidade_vagas=None):
         cur.close()
         release_db_connection(conn)
 
-def create_sensor(camara_id, modelo='PN5180', ip_address=None, ativo=True):
+def create_sensor(camara_id, modelo='PN5180', ativo=True):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -170,10 +170,15 @@ def create_sensor(camara_id, modelo='PN5180', ip_address=None, ativo=True):
         if not cur.fetchone():
             raise ValueError("Camara not found")
 
+        # Auto-assign to the first active dispositivo
+        cur.execute("SELECT id FROM DISPOSITIVO WHERE ativo = TRUE ORDER BY id LIMIT 1")
+        disp_row = cur.fetchone()
+        dispositivo_id = disp_row[0] if disp_row else None
+
         cur.execute(
-            "INSERT INTO SENSOR (camara_id, modelo, ip_address, ativo) "
-            "VALUES (%s, %s, %s, %s) RETURNING id, camara_id, modelo, ip_address, ativo",
-            (camara_id, modelo, ip_address, ativo)
+            "INSERT INTO SENSOR (camara_id, modelo, dispositivo_id, ativo) "
+            "VALUES (%s, %s, %s, %s) RETURNING id, camara_id, modelo, dispositivo_id, ativo",
+            (camara_id, modelo, dispositivo_id, ativo)
         )
         row = cur.fetchone()
         conn.commit()
@@ -181,7 +186,7 @@ def create_sensor(camara_id, modelo='PN5180', ip_address=None, ativo=True):
             "id": row[0],
             "camara_id": row[1],
             "modelo": row[2],
-            "ip_address": row[3],
+            "dispositivo_id": row[3],
             "ativo": row[4]
         }
     except Exception:
@@ -297,7 +302,7 @@ def delete_camara(camara_id):
         cur.close()
         release_db_connection(conn)
 
-def update_sensor(sensor_id, camara_id, modelo='PN5180', ip_address=None, ativo=True):
+def update_sensor(sensor_id, camara_id, modelo='PN5180', ativo=True):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -310,9 +315,9 @@ def update_sensor(sensor_id, camara_id, modelo='PN5180', ip_address=None, ativo=
             raise ValueError("Camara not found")
 
         cur.execute(
-            "UPDATE SENSOR SET camara_id = %s, modelo = %s, ip_address = %s, ativo = %s "
-            "WHERE id = %s RETURNING id, camara_id, modelo, ip_address, ativo",
-            (camara_id, modelo, ip_address, ativo, sensor_id)
+            "UPDATE SENSOR SET camara_id = %s, modelo = %s, ativo = %s "
+            "WHERE id = %s RETURNING id, camara_id, modelo, dispositivo_id, ativo",
+            (camara_id, modelo, ativo, sensor_id)
         )
         row = cur.fetchone()
 
@@ -321,7 +326,7 @@ def update_sensor(sensor_id, camara_id, modelo='PN5180', ip_address=None, ativo=
             "id": row[0],
             "camara_id": row[1],
             "modelo": row[2],
-            "ip_address": row[3],
+            "dispositivo_id": row[3],
             "ativo": row[4]
         }
     except Exception:
@@ -463,9 +468,11 @@ def fetch_infraestrutura_data():
         sensores_ativos = cur.fetchone()[0]
         
         cur.execute(
-            "SELECT s.id, s.camara_id, s.modelo, s.ip_address, c.nome, s.ativo "
+            "SELECT s.id, s.camara_id, s.modelo, s.dispositivo_id, c.nome, s.ativo, "
+            "COALESCE(d.nome, '-') "
             "FROM SENSOR s "
             "JOIN CAMARA c ON s.camara_id = c.id "
+            "LEFT JOIN DISPOSITIVO d ON s.dispositivo_id = d.id "
             "ORDER BY s.id DESC"
         )
         sensores = []
@@ -474,10 +481,11 @@ def fetch_infraestrutura_data():
                 "id": row[0],
                 "camara_id": row[1],
                 "modelo": row[2],
-                "ip": row[3],
+                "dispositivo_id": row[3],
                 "camara": row[4],
                 "status": "Ativo" if row[5] else "Inativo",
-                "ativo": row[5]
+                "ativo": row[5],
+                "dispositivo": row[6]
             })
 
         cur.execute(

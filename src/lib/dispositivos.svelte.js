@@ -44,7 +44,7 @@ class SensorStore {
 
 		const poll = async () => {
 			try {
-				const response = await fetch('http://127.0.0.1:5000/api/sensors/status');
+				const response = await fetch('http://127.0.0.1:5000/api/dispositivos/status');
 				if (response.ok) {
 					this.#statuses = await response.json();
 				}

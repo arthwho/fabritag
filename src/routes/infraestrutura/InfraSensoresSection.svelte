@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		TableBody,
 		TableBodyCell,
@@ -15,51 +14,30 @@
 	import TableActions from '$lib/components/TableActions.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
-	import { sensorStore } from '$lib/sensors.svelte.js';
-
 	type SensorRow = {
 		id: number;
 		modelo: string;
-		ip: string | null;
 		camara: string;
+		camara_id: number;
+		dispositivo: string;
+		dispositivo_id: number | null;
 		status: string;
+		ativo: boolean;
 	};
 
 	let {
 		filteredItems = [],
 		searchTerm = $bindable(''),
-		liveStatuses: initialLiveStatuses = {},
 		onOpenModal,
 		onEditSensor,
 		onDeleteSensor
 	}: {
 		filteredItems?: SensorRow[];
 		searchTerm?: string;
-		liveStatuses?: Record<string, { status: string; ip_address: string }>;
 		onOpenModal: () => void;
 		onEditSensor: (sensorId: number) => void | Promise<void>;
 		onDeleteSensor: (sensorId: number) => void | Promise<void>;
 	} = $props();
-
-	onMount(() => {
-		// Set initial state from server data to avoid "Offline" flicker
-		sensorStore.setInitial(initialLiveStatuses);
-
-		const stopPolling = sensorStore.startPolling();
-		return () => stopPolling;
-	});
-
-	function getStatus(sensor: SensorRow) {
-		const live = sensorStore.liveStatuses[sensor.id.toString()];
-		if (live) return live.status;
-		return 'Offline';
-	}
-
-	function getIP(sensor: SensorRow) {
-		const live = sensorStore.liveStatuses[sensor.id.toString()];
-		if (live && live.ip_address) return live.ip_address;
-		return sensor.ip || '-';
-	}
 </script>
 
 <div class="mb-4 flex items-center justify-between">
@@ -71,7 +49,7 @@
 </div>
 
 <TableSearch
-	placeholder="Buscar por ID, modelo, IP ou câmara..."
+	placeholder="Buscar por ID, modelo, câmara ou dispositivo..."
 	hoverable={true}
 	bind:inputValue={searchTerm}
 	divClass="overflow-hidden rounded-xl bg-white dark:bg-gray-800 shadow-none border border-gray-300 dark:border-gray-300"
@@ -85,23 +63,22 @@
 		<TableHeadCell class="p-4!"><Checkbox /></TableHeadCell>
 		<TableHeadCell>ID</TableHeadCell>
 		<TableHeadCell>Modelo</TableHeadCell>
-		<TableHeadCell>IP</TableHeadCell>
 		<TableHeadCell>Câmara</TableHeadCell>
+		<TableHeadCell>Dispositivo</TableHeadCell>
 		<TableHeadCell>Status</TableHeadCell>
 		<TableHeadCell>Ações</TableHeadCell>
 	</TableHead>
 	<TableBody>
 		{#each filteredItems as sensor}
-			{@const currentStatus = getStatus(sensor)}
 			<TableBodyRow>
 				<TableBodyCell class="p-4!"><Checkbox /></TableBodyCell>
 				<TableBodyCell>{sensor.id}</TableBodyCell>
 				<TableBodyCell>{sensor.modelo}</TableBodyCell>
-				<TableBodyCell>{getIP(sensor)}</TableBodyCell>
 				<TableBodyCell>{sensor.camara}</TableBodyCell>
+				<TableBodyCell>{sensor.dispositivo || '-'}</TableBodyCell>
 				<TableBodyCell>
-					<Badge border large color={currentStatus === 'Online' ? 'green' : 'red'}>
-						{currentStatus}
+					<Badge border large color={sensor.ativo ? 'green' : 'red'}>
+						{sensor.status}
 					</Badge>
 				</TableBodyCell>
 				<TableBodyCell class="flex gap-2">

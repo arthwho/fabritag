@@ -3,7 +3,7 @@ export async function load({ fetch }) {
 	try {
 		const [infraRes, liveRes] = await Promise.all([
 			fetch('http://127.0.0.1:5000/api/infraestrutura'),
-			fetch('http://127.0.0.1:5000/api/sensors/status')
+			fetch('http://127.0.0.1:5000/api/dispositivos/status')
 		]);
 
 		let infraData = null;

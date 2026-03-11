@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import InfoCard from '$lib/components/InfoCard.svelte';
-	import { sensorStore } from '$lib/sensors.svelte.js';
+	import { sensorStore } from '$lib/dispositivos.svelte.js';
 	import {
 		Badge,
 		TableSearch,
@@ -46,7 +46,6 @@
 
 	let sensorCamaraId = $state('');
 	let sensorModelo = $state('PN5180');
-	let sensorIpAddress = $state('');
 	let sensorAtivo = $state(true);
 
 	const normalize = (str: string) =>
@@ -177,7 +176,6 @@
 		editingSensorId = sensorId;
 		sensorCamaraId = sensor.camara_id?.toString() || '';
 		sensorModelo = sensor.modelo || 'PN5180';
-		sensorIpAddress = sensor.ip ?? '';
 		sensorAtivo = Boolean(sensor.ativo);
 		isSensorModalOpen = true;
 	}
@@ -218,7 +216,6 @@
 		editingSensorId = null;
 		sensorCamaraId = infraestrutura?.lista_camaras?.[0]?.id?.toString() || '';
 		sensorModelo = 'PN5180';
-		sensorIpAddress = '';
 		sensorAtivo = true;
 		isSensorModalOpen = true;
 	}
@@ -355,7 +352,6 @@
 				body: JSON.stringify({
 					camara_id: Number(sensorCamaraId),
 					modelo: sensorModelo || 'PN5180',
-					ip_address: sensorIpAddress || null,
 					ativo: sensorAtivo
 				})
 			});
@@ -390,7 +386,6 @@
 				body: JSON.stringify({
 					camara_id: Number(sensorCamaraId),
 					modelo: sensorModelo.trim() || 'PN5180',
-					ip_address: sensorIpAddress.trim() ? sensorIpAddress.trim() : null,
 					ativo: sensorAtivo
 				})
 			},
@@ -567,7 +562,6 @@
 			<InfraSensoresSection
 				bind:searchTerm
 				{filteredItems}
-				liveStatuses={data.liveStatuses}
 				onOpenModal={openSensorModal}
 				onEditSensor={handleEdit}
 				onDeleteSensor={handleDeleteSensor}
@@ -593,7 +587,6 @@
 			bind:camaraCapacidade
 			bind:sensorCamaraId
 			bind:sensorModelo
-			bind:sensorIpAddress
 			bind:sensorAtivo
 			predios={infraestrutura.lista_predios}
 			camaras={infraestrutura.lista_camaras}

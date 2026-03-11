@@ -15,7 +15,7 @@
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 
-	import { sensorStore } from '$lib/sensors.svelte.js';
+	import { sensorStore } from '$lib/dispositivos.svelte.js';
 
 	let { data } = $props();
 	let dashboard = $derived(data.dashboard);

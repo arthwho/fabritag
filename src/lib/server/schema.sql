@@ -15,23 +15,32 @@ CREATE TABLE IF NOT EXISTS CAMARA (
     capacidade_vagas INT
 );
 
--- Table 3: SENSOR (Hardware físico)
-CREATE TABLE IF NOT EXISTS SENSOR (
-    id SERIAL PRIMARY KEY,
-    camara_id INT REFERENCES CAMARA(id),
-    modelo VARCHAR(50) DEFAULT 'PN5180',
-    ip_address VARCHAR(50),
-    ativo BOOLEAN DEFAULT TRUE
-);
-
--- Table 10: CLIENTE (Empresa proprietária - Multi-tenancy)
+-- Table 3: CLIENTE (Empresa proprietária - Multi-tenancy)
 CREATE TABLE IF NOT EXISTS CLIENTE (
     id SERIAL PRIMARY KEY,
     cpf_cnpj VARCHAR(20) UNIQUE,
     nome_razao_social VARCHAR(150)
 );
 
--- Table 5: PRODUTO_TIPO (Catálogo de itens/SKU)
+-- Table 4: DISPOSITIVO (Microcontrolador / ESP32)
+CREATE TABLE IF NOT EXISTS DISPOSITIVO (
+    id SERIAL PRIMARY KEY,
+    cliente_id INT REFERENCES CLIENTE(id), -- Associação ao cliente
+    nome VARCHAR(100),                     -- Ex: 'ESP32 - Linha A'
+    ip_address VARCHAR(50),                -- O IP pertence ao microcontrolador
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- Table 5: SENSOR (Antena RFID - vinculada a um dispositivo)
+CREATE TABLE IF NOT EXISTS SENSOR (
+    id SERIAL PRIMARY KEY,
+    camara_id INT REFERENCES CAMARA(id),
+    modelo VARCHAR(50) DEFAULT 'PN5180',
+    dispositivo_id INT REFERENCES DISPOSITIVO(id),
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- Table 6: PRODUTO_TIPO (Catálogo de itens/SKU)
 CREATE TABLE IF NOT EXISTS PRODUTO_TIPO (
     id SERIAL PRIMARY KEY,
     cliente_id INT REFERENCES CLIENTE(id),
@@ -78,4 +87,6 @@ CREATE TABLE IF NOT EXISTS USUARIO (
 -- Dados iniciais para teste
 INSERT INTO PREDIO (nome, endereco) VALUES ('Prédio Central', 'Rua das Indústrias, 100') ON CONFLICT DO NOTHING;
 INSERT INTO CAMARA (predio_id, nome, capacidade_vagas) VALUES (1, 'Câmara de Testes 1', 10) ON CONFLICT DO NOTHING;
-INSERT INTO SENSOR (camara_id, modelo, ip_address, ativo) VALUES (1, 'PN5180', '192.168.2.175', TRUE) ON CONFLICT DO NOTHING;
+INSERT INTO CLIENTE (cpf_cnpj, nome_razao_social) VALUES ('00000000000', 'Cliente Teste') ON CONFLICT DO NOTHING;
+INSERT INTO DISPOSITIVO (cliente_id, nome, ip_address, ativo) VALUES (1, 'ESP32 - Linha A', '192.168.2.175', TRUE) ON CONFLICT DO NOTHING;
+INSERT INTO SENSOR (camara_id, modelo, dispositivo_id, ativo) VALUES (1, 'PN5180', 1, TRUE) ON CONFLICT DO NOTHING;
