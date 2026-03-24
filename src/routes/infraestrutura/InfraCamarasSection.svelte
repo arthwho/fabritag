@@ -8,7 +8,8 @@
 		Checkbox,
 		TableSearch,
 		Button,
-		PlusOutline
+		PlusOutline,
+		ChevronRightOutline
 	} from '$lib/uicomponents.js';
 	import TableActions from '$lib/components/TableActions.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
@@ -73,7 +74,15 @@
 			<TableBodyRow>
 				<TableBodyCell class="p-4!"><Checkbox /></TableBodyCell>
 				<TableBodyCell>{camara.id}</TableBodyCell>
-				<TableBodyCell>{camara.nome}</TableBodyCell>
+				<TableBodyCell>
+					<a
+						href={`/infraestrutura/camaras/${camara.id}`}
+						class="flex items-center gap-2 font-medium hover:underline dark:text-white"
+					>
+						{camara.nome}
+						<ChevronRightOutline class="h-4 w-4 text-gray-400" />
+					</a>
+				</TableBodyCell>
 				<TableBodyCell>{camara.predio}</TableBodyCell>
 				<TableBodyCell>{camara.capacidade_vagas}</TableBodyCell>
 				<TableBodyCell>{camara.total_sensores}</TableBodyCell>

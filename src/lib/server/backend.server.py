@@ -87,6 +87,16 @@ def delete_predio(predio_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/camaras/<int:camara_id>', methods=['GET'])
+def get_camara_detalhes(camara_id):
+    try:
+        camara = db.fetch_camara_detalhes(camara_id)
+        if not camara:
+            return jsonify({"error": "Camara not found"}), 404
+        return jsonify(camara), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/camaras', methods=['POST'])
 def create_camara():
     data = request.json or {}

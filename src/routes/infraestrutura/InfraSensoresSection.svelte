@@ -9,7 +9,8 @@
 		TableSearch,
 		Badge,
 		Button,
-		PlusOutline
+		PlusOutline,
+		ChevronRightOutline
 	} from '$lib/uicomponents.js';
 	import TableActions from '$lib/components/TableActions.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
@@ -74,7 +75,12 @@
 				<TableBodyCell class="p-4!"><Checkbox /></TableBodyCell>
 				<TableBodyCell>{sensor.id}</TableBodyCell>
 				<TableBodyCell>{sensor.modelo}</TableBodyCell>
-				<TableBodyCell>{sensor.camara}</TableBodyCell>
+				<TableBodyCell>
+					<a href={`/infraestrutura/camaras/${sensor.camara_id}`} class="flex items-center gap-2 font-medium hover:underline dark:text-white">
+						{sensor.camara}
+						<ChevronRightOutline class="w-4 h-4 text-gray-400" />
+					</a>
+				</TableBodyCell>
 				<TableBodyCell>{sensor.dispositivo || '-'}</TableBodyCell>
 				<TableBodyCell>
 					<Badge border large color={sensor.ativo ? 'green' : 'red'}>

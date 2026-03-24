@@ -76,11 +76,24 @@ void sendTagEvent(String uid, String eventType);
 String uidToString(uint8_t *uid, uint8_t length);
 // ---------------------------
 
-void saveConfigCallback()
-{
-  Serial.println("User saved new settings in portal!");
-  shouldSaveConfig = true;
+void forceSaveToFlash() {
+  Serial.println("FORCE SAVE TRIGGERED! Writing to flash...");
+  
+  String newUrl = custom_server_url.getValue();
+  String newId = custom_sensor_id.getValue();
+
+  Preferences preferences;
+  preferences.begin("appData", false); 
+  preferences.putString("serverUrl", newUrl);
+  preferences.putString("sensorId", newId);
+  preferences.end();
+  
+  Serial.println("Permanently locked in: " + newUrl);
 }
+
+// Catch BOTH types of saves!
+void saveConfigCallback() { forceSaveToFlash(); }
+void saveParamsCallback() { forceSaveToFlash(); }
 
 void configModeCallback(WiFiManager *myWiFiManager)
 {

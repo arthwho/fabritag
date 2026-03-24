@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS MOVIMENTACAO (
     id BIGSERIAL PRIMARY KEY,
     epc_tag VARCHAR(50),
     camara_id INT REFERENCES CAMARA(id),
+    posicao_vaga INT, -- Index of the starting slot (0 to capacity-1)
     data_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_saida TIMESTAMP,
     supervisor_id INT, -- A tabela USUARIO seria referenciada aqui

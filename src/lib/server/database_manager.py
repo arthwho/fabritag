@@ -384,9 +384,16 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
                 (epc_tag, camara_id)
             )
             if not cur.fetchone():
+                # Get batch size
+                cur.execute("SELECT quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
+                qty_res = cur.fetchone()
+                batch_size = max(1, int(qty_res[0] or 1)) if qty_res else 1
+
+                pos_vaga = _find_available_slot(cur, camara_id, batch_size)
+
                 cur.execute(
-                    "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, data_entrada) VALUES (%s, %s, NOW())",
-                    (epc_tag, camara_id)
+                    "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, posicao_vaga, data_entrada) VALUES (%s, %s, %s, NOW())",
+                    (epc_tag, camara_id, pos_vaga)
                 )
         
         elif event == "REMOVED":
@@ -574,3 +581,81 @@ def fetch_pagina_produtos_data():
     finally:
         cur.close()
         release_db_connection(conn)
+
+def fetch_camara_detalhes(camara_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Get camara info
+        cur.execute(
+            "SELECT c.id, c.nome, p.nome, c.capacidade_vagas "
+            "FROM CAMARA c "
+            "JOIN PREDIO p ON p.id = c.predio_id "
+            "WHERE c.id = %s",
+            (camara_id,)
+        )
+        camara_row = cur.fetchone()
+        if not camara_row:
+            return None
+
+        camara_info = {
+            "id": camara_row[0],
+            "nome": camara_row[1],
+            "predio": camara_row[2],
+            "capacidade": camara_row[3]
+        }
+
+        # Get batches currently in this camara
+        cur.execute(
+            "SELECT m.epc_tag, pt.nome, m.data_entrada, l.quantidade_atual, m.posicao_vaga "
+            "FROM MOVIMENTACAO m "
+            "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
+            "LEFT JOIN PRODUTO_TIPO pt ON pt.id = l.produto_tipo_id "
+            "WHERE m.camara_id = %s AND m.data_saida IS NULL "
+            "ORDER BY m.posicao_vaga ASC",
+            (camara_id,)
+        )
+        batches = []
+        for row in cur.fetchall():
+            batches.append({
+                "epc_tag": row[0],
+                "produto": row[1] or "Sem produto",
+                "data_entrada": row[2].strftime("%Y-%m-%d %H:%M:%S") if row[2] else None,
+                "quantidade": row[3] or 1,
+                "posicao_vaga": row[4]
+            })
+        
+        camara_info["lotes"] = batches
+        return camara_info
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def _find_available_slot(cur, camara_id, batch_size):
+    # 1. Get capacity
+    cur.execute("SELECT capacidade_vagas FROM CAMARA WHERE id = %s", (camara_id,))
+    res = cur.fetchone()
+    if not res: return 0
+    capacity = res[0] or 100
+
+    # 2. Get current occupancy (open movimentacoes)
+    cur.execute(
+        "SELECT m.posicao_vaga, l.quantidade_atual "
+        "FROM MOVIMENTACAO m "
+        "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
+        "WHERE m.camara_id = %s AND m.data_saida IS NULL AND m.posicao_vaga IS NOT NULL",
+        (camara_id,)
+    )
+    
+    occupied = [False] * capacity
+    for pos_vaga, qty in cur.fetchall():
+        q = max(1, int(qty or 1))
+        for i in range(pos_vaga, min(pos_vaga + q, capacity)):
+            occupied[i] = True
+
+    # 3. Find contiguous space
+    for i in range(capacity - batch_size + 1):
+        if not any(occupied[i : i + batch_size]):
+            return i
+            
+    return None # No space left

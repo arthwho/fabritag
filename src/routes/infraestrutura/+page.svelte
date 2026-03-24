@@ -10,7 +10,8 @@
 		TableHeadCell,
 		TableBody,
 		TableBodyRow,
-		TableBodyCell
+		TableBodyCell,
+		ChevronRightOutline
 	} from '$lib/uicomponents.js';
 	import InfraPrediosSection from './InfraPrediosSection.svelte';
 	import InfraCamarasSection from './InfraCamarasSection.svelte';
@@ -76,14 +77,16 @@
 		}) || []
 	);
 
-	let allTableRows = $derived(
-		(infraestrutura?.lista_camaras || []).map((camara) => ({
+	let allTableRows = $derived.by(() => {
+		if (!infraestrutura?.lista_camaras) return [];
+		return infraestrutura.lista_camaras.map((camara) => ({
+			id: camara.id,
 			camara: camara.nome,
 			predio: camara.predio,
 			total_sensores: Number(camara.total_sensores || 0),
-			status: camara.sensores_ativos > 0 ? 'Ativa' : 'Inativa'
-		}))
-	);
+			status: (camara.sensores_ativos || 0) > 0 ? 'Ativa' : 'Inativa'
+		}));
+	});
 
 	let filteredAllTableRows = $derived(
 		allTableRows.filter((item) => {
@@ -529,7 +532,12 @@
 				<TableBody>
 					{#each filteredAllTableRows as row}
 						<TableBodyRow>
-							<TableBodyCell>{row.camara}</TableBodyCell>
+							<TableBodyCell>
+								<a href={`/infraestrutura/camaras/${row.id}`} class="flex items-center gap-2 font-medium hover:underline dark:text-white">
+									{row.camara}
+									<ChevronRightOutline class="w-4 h-4 text-gray-400" />
+								</a>
+							</TableBodyCell>
 							<TableBodyCell>{row.predio}</TableBodyCell>
 							<TableBodyCell>{row.total_sensores}</TableBodyCell>
 						</TableBodyRow>

@@ -11,6 +11,7 @@ void setupWiFi() {
   wm.setMenu(menu);
 
   wm.setSaveConfigCallback(saveConfigCallback);
+  wm.setSaveParamsCallback(saveParamsCallback); // <-- ADD THIS LINE!
   wm.setAPCallback(configModeCallback);
   wm.setClass("invert"); 
   wm.setTitle("Fabritag Manager");
@@ -33,17 +34,6 @@ void setupWiFi() {
     updateScreen("WiFi Error!", "Rebooting...");
     delay(3000);
     ESP.restart();
-  }
-
-  if (shouldSaveConfig) {
-    serverUrl = custom_server_url.getValue();
-    sensorId = custom_sensor_id.getValue();
-    
-    Serial.println("Saving new custom settings to flash...");
-    preferences.begin("appData", false); 
-    preferences.putString("serverUrl", serverUrl);
-    preferences.putString("sensorId", sensorId);
-    preferences.end();
   }
 
   isWifiConnected = true;
@@ -77,6 +67,7 @@ void performServerHealthCheck() {
     std::vector<const char *> menu = {"wifi", "info", "param", "sep", "restart", "exit"};
     wm.setMenu(menu);
     wm.setSaveConfigCallback(saveConfigCallback);
+    wm.setSaveParamsCallback(saveParamsCallback); // <-- ADD THIS LINE!
     wm.setClass("invert"); 
     wm.setTitle("Fabritag Manager");
     wm.setCustomHeadElement(customPortalCSS);
