@@ -26,12 +26,142 @@ def get_produto_tipos():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/clientes', methods=['GET'])
+def get_clientes():
+    try:
+        clientes = db.fetch_clientes()
+        return jsonify(clientes)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/produtos', methods=['POST'])
+def create_produto():
+    data = request.json or {}
+    nome = data.get('nome')
+    cliente_id = data.get('cliente_id')
+    sku = data.get('sku')
+    unidade_medida = data.get('unidade_medida')
+
+    if cliente_id in ('', None):
+        cliente_id = None
+
+    if not nome:
+        return jsonify({"error": "Missing required field: nome"}), 400
+
+    try:
+        produto = db.create_produto_tipo(
+            cliente_id=cliente_id,
+            nome=nome,
+            sku=sku,
+            unidade_medida=unidade_medida
+        )
+        return jsonify(produto), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/produtos/<int:produto_id>', methods=['PUT'])
+def update_produto(produto_id):
+    data = request.json or {}
+    nome = data.get('nome')
+    cliente_id = data.get('cliente_id')
+    sku = data.get('sku')
+    unidade_medida = data.get('unidade_medida')
+
+    if cliente_id in ('', None):
+        cliente_id = None
+
+    if not nome:
+        return jsonify({"error": "Missing required field: nome"}), 400
+
+    try:
+        produto = db.update_produto_tipo(
+            produto_id=produto_id,
+            cliente_id=cliente_id,
+            nome=nome,
+            sku=sku,
+            unidade_medida=unidade_medida
+        )
+        return jsonify(produto), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/produtos/<int:produto_id>', methods=['DELETE'])
+def delete_produto(produto_id):
+    try:
+        result = db.delete_produto_tipo(produto_id=produto_id)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/batches', methods=['GET'])
 @app.route('/api/lotes', methods=['GET'])
 def get_batches():
     try:
         batches = db.fetch_batch()
         return jsonify(batches)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/lotes/<string:epc_tag>', methods=['PUT'])
+def update_lote(epc_tag):
+    data = request.json or {}
+    produto_assoc = data.get('produto_assoc')
+    produto_tipo_ids = data.get('produto_tipo_ids')
+    produto_tipo_id = data.get('produto_tipo_id')
+    quantidade_atual = data.get('quantidade_atual')
+
+    if produto_assoc is None:
+        if produto_tipo_ids is None:
+            produto_tipo_ids = [produto_tipo_id] if produto_tipo_id not in ('', None) else []
+
+        if quantidade_atual is None:
+            return jsonify({"error": "Missing required field: quantidade_atual"}), 400
+
+        if not isinstance(produto_tipo_ids, list) or len(produto_tipo_ids) == 0:
+            return jsonify({"error": "Missing required field: produto_tipo_ids"}), 400
+
+        try:
+            quantidade_atual = float(quantidade_atual)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid field: quantidade_atual"}), 400
+
+        if quantidade_atual <= 0:
+            return jsonify({"error": "Invalid field: quantidade_atual"}), 400
+
+        try:
+            produto_tipo_ids = [int(produto_id) for produto_id in produto_tipo_ids]
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid field: produto_tipo_ids"}), 400
+
+        produto_assoc = [
+            {
+                "produto_tipo_id": produto_id,
+                "quantidade": quantidade_atual
+            }
+            for produto_id in produto_tipo_ids
+        ]
+    elif not isinstance(produto_assoc, list) or len(produto_assoc) == 0:
+        return jsonify({"error": "Missing required field: produto_assoc"}), 400
+
+    try:
+        lote = db.update_lote_taggeado(
+            epc_tag=epc_tag,
+            produto_assoc=produto_assoc
+        )
+        return jsonify(lote), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

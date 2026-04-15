@@ -3,6 +3,7 @@
 		Button,
 		ChevronDownOutline,
 		FilterOutline,
+		PlusOutline,
 		Dropdown,
 		DropdownItem
 	} from '$lib/uicomponents.js';
@@ -11,6 +12,8 @@
 		idPrefix: string;
 		filterOptions?: string[];
 		exportOptions?: string[];
+		onCreate?: () => void;
+		createLabel?: string;
 		filterLabel?: string;
 		exportLabel?: string;
 		class?: string;
@@ -21,6 +24,8 @@
 		idPrefix,
 		filterOptions = ['Todos'],
 		exportOptions = ['Excel (.xlsx)', 'PDF (.pdf)', 'CSV (.csv)'],
+		onCreate,
+		createLabel = 'Adicionar',
 		filterLabel = 'Filtros',
 		exportLabel = 'Exportar',
 		class: className = '',
@@ -46,7 +51,14 @@
 </script>
 
 <div class={`flex flex-col gap-2 md:contents ${className}`} {...props}>
-	<div class="flex justify-start gap-2 md:justify-end">
+	<div class="flex flex-wrap justify-start gap-2 md:justify-end">
+		{#if onCreate}
+			<Button outline size="sm" color="orange" class="gap-2" onclick={onCreate}>
+				<PlusOutline class="h-4 w-4" />
+				{createLabel}
+			</Button>
+		{/if}
+
 		<Button
 			id={filterButtonId}
 			outline

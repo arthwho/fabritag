@@ -30,16 +30,44 @@ def get_db_connection():
 def release_db_connection(conn):
     db_pool.putconn(conn)
 
+def _ensure_lote_produto_assoc_table(cur):
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS LOTE_PRODUTO_ASSOC ("
+        "epc_tag VARCHAR(50) REFERENCES LOTE_TAGGEADO(epc_tag) ON DELETE CASCADE, "
+        "produto_tipo_id INT REFERENCES PRODUTO_TIPO(id), "
+        "quantidade FLOAT NOT NULL DEFAULT 1, "
+        "PRIMARY KEY (epc_tag, produto_tipo_id)"
+        ")"
+    )
+    cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ADD COLUMN IF NOT EXISTS quantidade FLOAT")
+    cur.execute("UPDATE LOTE_PRODUTO_ASSOC SET quantidade = 1 WHERE quantidade IS NULL")
+    cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET DEFAULT 1")
+    cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET NOT NULL")
+
 def fetch_batch():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_produto_assoc_table(cur)
+
         cur.execute(
             "SELECT l.epc_tag, l.produto_tipo_id, l.quantidade_atual, l.status, "
-            "COALESCE(pt.nome, 'Lote sem produto'), COALESCE(c_atual.nome, 'Desconhecido'), "
-            "m_atual.data_entrada "
+            "COALESCE(c_atual.nome, 'Desconhecido'), m_atual.data_entrada, "
+            "COALESCE(prod_assoc.produto_ids, CASE WHEN l.produto_tipo_id IS NOT NULL THEN ARRAY[l.produto_tipo_id]::INT[] ELSE ARRAY[]::INT[] END), "
+            "COALESCE(prod_assoc.produto_nomes, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[pt_legacy.nome]::TEXT[] ELSE ARRAY[]::TEXT[] END), "
+            "COALESCE(prod_assoc.produto_quantidades, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[COALESCE(l.quantidade_atual, 1)]::FLOAT[] ELSE ARRAY[]::FLOAT[] END), "
+            "COALESCE(prod_assoc.quantidade_total, COALESCE(l.quantidade_atual, 0)) "
             "FROM LOTE_TAGGEADO l "
-            "LEFT JOIN PRODUTO_TIPO pt ON pt.id = l.produto_tipo_id "
+            "LEFT JOIN PRODUTO_TIPO pt_legacy ON pt_legacy.id = l.produto_tipo_id "
+            "LEFT JOIN LATERAL ("
+            "  SELECT ARRAY_AGG(lp.produto_tipo_id ORDER BY lp.produto_tipo_id) AS produto_ids, "
+            "  ARRAY_AGG(COALESCE(pt.nome, 'Produto sem nome') ORDER BY lp.produto_tipo_id) AS produto_nomes, "
+            "  ARRAY_AGG(lp.quantidade ORDER BY lp.produto_tipo_id) AS produto_quantidades, "
+            "  SUM(lp.quantidade) AS quantidade_total "
+            "  FROM LOTE_PRODUTO_ASSOC lp "
+            "  LEFT JOIN PRODUTO_TIPO pt ON pt.id = lp.produto_tipo_id "
+            "  WHERE lp.epc_tag = l.epc_tag"
+            ") prod_assoc ON TRUE "
             "LEFT JOIN LATERAL ("
             "  SELECT m.camara_id, m.data_entrada "
             "  FROM MOVIMENTACAO m "
@@ -65,18 +93,28 @@ def fetch_batch():
                 "LEFT JOIN CAMARA c_atual ON c_atual.id = m_atual.camara_id "
                 "ORDER BY m.epc_tag"
             )
-            rows = [(row[0], None, None, None, 'Lote sem produto', row[1], row[2]) for row in cur.fetchall()]
+            rows = [(row[0], None, None, None, row[1], row[2], [], [], [], 0) for row in cur.fetchall()]
         return [
             {
                 "id": row[0],
-                "nome": f"{row[4]} ({row[0]})",
+                "nome": f"{', '.join(row[7]) if row[7] else 'Lote sem produto'} ({row[0]})",
                 "epc_tag": row[0],
-                "produto_tipo_id": row[1],
-                "quantidade_atual": row[2],
+                "produto_tipo_id": (row[6][0] if row[6] else row[1]),
+                "produto_tipo_ids": row[6] or [],
+                "quantidade_atual": row[9],
                 "status": row[3],
-                "produto_nome": row[4],
-                "local_atual": row[5],
-                "local_desde": row[6].strftime("%Y-%m-%d %H:%M:%S") if row[6] else None
+                "produto_nome": ', '.join(row[7]) if row[7] else 'Lote sem produto',
+                "produto_nomes": row[7] or [],
+                "produto_assoc": [
+                    {
+                        "produto_tipo_id": produto_id,
+                        "produto_nome": produto_nome,
+                        "quantidade": quantidade
+                    }
+                    for produto_id, produto_nome, quantidade in zip(row[6] or [], row[7] or [], row[8] or [])
+                ],
+                "local_atual": row[4],
+                "local_desde": row[5].strftime("%Y-%m-%d %H:%M:%S") if row[5] else None
             }
             for row in rows
         ]
@@ -108,6 +146,26 @@ def fetch_camaras():
     try:
         cur.execute("SELECT id, nome FROM CAMARA")
         return [{"id": row[0], "nome": row[1]} for row in cur.fetchall()]
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def fetch_clientes():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT id, COALESCE(nome_razao_social, 'Cliente sem nome'), cpf_cnpj "
+            "FROM CLIENTE ORDER BY id"
+        )
+        return [
+            {
+                "id": row[0],
+                "nome": row[1],
+                "cpf_cnpj": row[2]
+            }
+            for row in cur.fetchall()
+        ]
     finally:
         cur.close()
         release_db_connection(conn)
@@ -549,11 +607,14 @@ def fetch_pagina_produtos_data():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_produto_assoc_table(cur)
+
         cur.execute(
-            "SELECT pt.id, pt.cliente_id, pt.nome, pt.sku, pt.unidade_medida, COUNT(DISTINCT lt.epc_tag) "
+            "SELECT pt.id, pt.cliente_id, COALESCE(c.nome_razao_social, '-'), pt.nome, pt.sku, pt.unidade_medida, COUNT(DISTINCT lt.epc_tag) "
             "FROM PRODUTO_TIPO pt "
+            "LEFT JOIN CLIENTE c ON c.id = pt.cliente_id "
             "LEFT JOIN LOTE_TAGGEADO lt ON lt.produto_tipo_id = pt.id "
-            "GROUP BY pt.id, pt.cliente_id, pt.nome, pt.sku, pt.unidade_medida "
+            "GROUP BY pt.id, pt.cliente_id, c.nome_razao_social, pt.nome, pt.sku, pt.unidade_medida "
             "ORDER BY pt.nome"
         )
         produtos = []
@@ -561,15 +622,17 @@ def fetch_pagina_produtos_data():
             produtos.append({
                 "id": row[0],
                 "cliente_id": row[1],
-                "nome": row[2],
-                "sku": row[3],
-                "unidade_medida": row[4],
-                "total_lotes": row[5]
+                "cliente_nome": row[2],
+                "nome": row[3],
+                "sku": row[4],
+                "unidade_medida": row[5],
+                "total_lotes": row[6]
             })
 
         cur.execute(
             "SELECT epc_tag FROM LOTE_TAGGEADO "
-            "WHERE produto_tipo_id IS NULL OR produto_tipo_id NOT IN (SELECT id FROM PRODUTO_TIPO) "
+            "WHERE NOT EXISTS (SELECT 1 FROM LOTE_PRODUTO_ASSOC lpa WHERE lpa.epc_tag = LOTE_TAGGEADO.epc_tag) "
+            "AND (produto_tipo_id IS NULL OR produto_tipo_id NOT IN (SELECT id FROM PRODUTO_TIPO)) "
             "ORDER BY epc_tag"
         )
         lotes_sem_produto = [{"epc_tag": row[0]} for row in cur.fetchall()]
@@ -578,6 +641,184 @@ def fetch_pagina_produtos_data():
             "produtos": produtos,
             "lotes_sem_produto": lotes_sem_produto
         }
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def create_produto_tipo(cliente_id=None, nome=None, sku=None, unidade_medida=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if cliente_id is not None:
+            cur.execute("SELECT 1 FROM CLIENTE WHERE id = %s", (cliente_id,))
+            if not cur.fetchone():
+                raise ValueError("Cliente not found")
+
+        cur.execute(
+            "INSERT INTO PRODUTO_TIPO (cliente_id, nome, sku, unidade_medida) "
+            "VALUES (%s, %s, %s, %s) RETURNING id, cliente_id, nome, sku, unidade_medida",
+            (cliente_id, nome, sku, unidade_medida)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row[0],
+            "cliente_id": row[1],
+            "nome": row[2],
+            "sku": row[3],
+            "unidade_medida": row[4]
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def update_produto_tipo(produto_id, cliente_id=None, nome=None, sku=None, unidade_medida=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT 1 FROM PRODUTO_TIPO WHERE id = %s", (produto_id,))
+        if not cur.fetchone():
+            raise ValueError("Produto not found")
+
+        if cliente_id is not None:
+            cur.execute("SELECT 1 FROM CLIENTE WHERE id = %s", (cliente_id,))
+            if not cur.fetchone():
+                raise ValueError("Cliente not found")
+
+        cur.execute(
+            "UPDATE PRODUTO_TIPO SET cliente_id = %s, nome = %s, sku = %s, unidade_medida = %s "
+            "WHERE id = %s RETURNING id, cliente_id, nome, sku, unidade_medida",
+            (cliente_id, nome, sku, unidade_medida, produto_id)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row[0],
+            "cliente_id": row[1],
+            "nome": row[2],
+            "sku": row[3],
+            "unidade_medida": row[4]
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def delete_produto_tipo(produto_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) FROM LOTE_TAGGEADO WHERE produto_tipo_id = %s", (produto_id,))
+        if cur.fetchone()[0] > 0:
+            raise ValueError("Cannot delete produto with existing lotes")
+
+        cur.execute("DELETE FROM PRODUTO_TIPO WHERE id = %s RETURNING id", (produto_id,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("Produto not found")
+
+        conn.commit()
+        return {"id": row[0]}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def update_lote_taggeado(epc_tag, produto_assoc=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        _ensure_lote_produto_assoc_table(cur)
+
+        cur.execute("SELECT 1 FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
+        if not cur.fetchone():
+            raise ValueError("Lote not found")
+
+        produto_assoc = produto_assoc or []
+        if not produto_assoc:
+            raise ValueError("Lote must have at least one produto associado")
+
+        normalized_assoc = {}
+        for item in produto_assoc:
+            produto_id = int(item.get('produto_tipo_id'))
+            quantidade = float(item.get('quantidade'))
+
+            if produto_id <= 0:
+                raise ValueError("Produto not found")
+            if quantidade <= 0:
+                raise ValueError("Invalid quantidade for produto")
+
+            normalized_assoc[produto_id] = normalized_assoc.get(produto_id, 0) + quantidade
+
+        produto_tipo_ids = sorted(normalized_assoc.keys())
+
+        cur.execute("SELECT id, unidade_medida FROM PRODUTO_TIPO WHERE id = ANY(%s)", (produto_tipo_ids,))
+        produto_rows = cur.fetchall()
+        found_ids = {row[0] for row in produto_rows}
+        if len(found_ids) != len(produto_tipo_ids):
+            raise ValueError("Produto not found")
+
+        unidade_by_produto = {
+            row[0]: ((row[1] or '').strip().lower())
+            for row in produto_rows
+        }
+
+        for produto_id, quantidade in normalized_assoc.items():
+            if unidade_by_produto.get(produto_id) in ('un', 'unidade') and not float(quantidade).is_integer():
+                raise ValueError("Produtos em unidade (un) devem usar quantidade inteira")
+
+        cur.execute("DELETE FROM LOTE_PRODUTO_ASSOC WHERE epc_tag = %s", (epc_tag,))
+        for produto_id in produto_tipo_ids:
+            cur.execute(
+                "INSERT INTO LOTE_PRODUTO_ASSOC (epc_tag, produto_tipo_id, quantidade) VALUES (%s, %s, %s)",
+                (epc_tag, produto_id, normalized_assoc[produto_id])
+            )
+
+        quantidade_total = sum(normalized_assoc.values())
+
+        cur.execute(
+            "UPDATE LOTE_TAGGEADO SET produto_tipo_id = %s, quantidade_atual = %s "
+            "WHERE epc_tag = %s RETURNING epc_tag, produto_tipo_id, quantidade_atual, status",
+            (produto_tipo_ids[0], quantidade_total, epc_tag)
+        )
+        row = cur.fetchone()
+
+        cur.execute(
+            "SELECT lp.produto_tipo_id, COALESCE(pt.nome, 'Produto sem nome'), lp.quantidade "
+            "FROM LOTE_PRODUTO_ASSOC lp "
+            "LEFT JOIN PRODUTO_TIPO pt ON pt.id = lp.produto_tipo_id "
+            "WHERE lp.epc_tag = %s ORDER BY lp.produto_tipo_id",
+            (epc_tag,)
+        )
+        produtos = cur.fetchall()
+
+        conn.commit()
+        return {
+            "epc_tag": row[0],
+            "produto_tipo_id": row[1],
+            "produto_tipo_ids": [produto[0] for produto in produtos],
+            "quantidade_atual": row[2],
+            "status": row[3],
+            "produto_nomes": [produto[1] for produto in produtos],
+            "produto_assoc": [
+                {
+                    "produto_tipo_id": produto[0],
+                    "produto_nome": produto[1],
+                    "quantidade": produto[2]
+                }
+                for produto in produtos
+            ]
+        }
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         release_db_connection(conn)

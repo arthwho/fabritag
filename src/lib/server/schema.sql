@@ -52,10 +52,38 @@ CREATE TABLE IF NOT EXISTS PRODUTO_TIPO (
 -- Table 7: LOTE_TAGGEADO (Instância física rastreada)
 CREATE TABLE IF NOT EXISTS LOTE_TAGGEADO (
     epc_tag VARCHAR(50) PRIMARY KEY,
-    produto_tipo_id INT REFERENCES PRODUTO_TIPO(id),
+    produto_tipo_id INT REFERENCES PRODUTO_TIPO(id), -- Legado: compatibilidade temporária (primeiro produto associado)
     quantidade_atual FLOAT,
     status VARCHAR(50)
 );
+
+-- Table 7.1: LOTE_PRODUTO_ASSOC (Associação N:N entre lote e produto)
+CREATE TABLE IF NOT EXISTS LOTE_PRODUTO_ASSOC (
+    epc_tag VARCHAR(50) REFERENCES LOTE_TAGGEADO(epc_tag) ON DELETE CASCADE,
+    produto_tipo_id INT REFERENCES PRODUTO_TIPO(id),
+    quantidade FLOAT NOT NULL DEFAULT 1,
+    PRIMARY KEY (epc_tag, produto_tipo_id)
+);
+
+ALTER TABLE LOTE_PRODUTO_ASSOC ADD COLUMN IF NOT EXISTS quantidade FLOAT;
+UPDATE LOTE_PRODUTO_ASSOC SET quantidade = 1 WHERE quantidade IS NULL;
+ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET DEFAULT 1;
+ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_lote_produto_assoc_produto ON LOTE_PRODUTO_ASSOC(produto_tipo_id);
+
+-- Migração de compatibilidade: replica o vínculo legado para a associação N:N
+INSERT INTO LOTE_PRODUTO_ASSOC (epc_tag, produto_tipo_id)
+SELECT epc_tag, produto_tipo_id
+FROM LOTE_TAGGEADO
+WHERE produto_tipo_id IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+UPDATE LOTE_PRODUTO_ASSOC lpa
+SET quantidade = COALESCE(lt.quantidade_atual, 1)
+FROM LOTE_TAGGEADO lt
+WHERE lpa.epc_tag = lt.epc_tag
+AND lpa.quantidade = 1;
 
 -- Table 8: LEITURA_BRUTA (Telemetria)
 CREATE TABLE IF NOT EXISTS LEITURA_BRUTA (
