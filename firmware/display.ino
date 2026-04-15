@@ -25,14 +25,14 @@ void updateScreen(String line1, String line2, String line3) {
 }
 
 // Check if it is time to sleep
-void handleScreenSaver() {
+//void handleScreenSaver() {
   // If the screen is awake AND 2000 milliseconds (2 seconds) have passed...
-  if (!isScreenAsleep && (millis() - lastScreenUpdate > 2000)) {
-    display.clearDisplay();
-    display.display(); // Push the black pixels to the hardware
-    isScreenAsleep = true;
-  }
-}
+  //if (!isScreenAsleep && (millis() - lastScreenUpdate > 2000)) {
+    //display.clearDisplay();
+    //display.display(); // Push the black pixels to the hardware
+    //isScreenAsleep = true;
+  //}
+//}
 
 void drawLoadingAnim(String headerText) {
   display.clearDisplay();

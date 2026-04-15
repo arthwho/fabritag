@@ -36,8 +36,8 @@ const String ADMIN_TAG_UID = "AB E0 68 06";
 
 // --- PN5180 CONFIGURATION ---
 #define PN5180_NSS 5
-#define PN5180_BUSY 22
-#define PN5180_RST 21
+#define PN5180_BUSY 14
+#define PN5180_RST 13
 PN5180ISO14443 nfc(PN5180_NSS, PN5180_BUSY, PN5180_RST);
 
 // --- STATE VARIABLES ---
@@ -70,7 +70,7 @@ void drawLoadingAnim(String headerText);
 void startLoading(String text);
 void stopLoading();
 void setupWiFi();
-void handleScreenSaver();
+//void handleScreenSaver();
 void performServerHealthCheck();
 void sendTagEvent(String uid, String eventType);
 String uidToString(uint8_t *uid, uint8_t length);
@@ -104,7 +104,7 @@ void configModeCallback(WiFiManager *myWiFiManager)
 
 void setup()
 {
-  handleScreenSaver();
+  //handleScreenSaver();
   setCpuFrequencyMhz(80);
   Serial.begin(115200);
 
@@ -134,18 +134,32 @@ void setup()
   setupWiFi();
   performServerHealthCheck(); // <-- Called right here!
 
-  startLoading("Starting NFC..."); // Starts the background spinner
+  updateScreen("Estabilizando...", "Energia...");
+  delay(1500);
+
+  //startLoading("Starting NFC..."); // Starts the background spinner
+  updateScreen("Starting NFC..."); 
+  delay(100);
+
+  Serial.println("1. Executando nfc.begin()...");
   nfc.begin();
+  
+  Serial.println("2. Executando nfc.reset()...");
   nfc.reset();
+  
+  Serial.println("3. Executando nfc.setupRF()...");
   nfc.setupRF();
-  stopLoading(); // Stops it smoothly when finished
+  
+  Serial.println("--- NFC INICIADO COM SUCESSO! ---");
+  // -------------------------------
+  //stopLoading(); // Stops it smoothly when finished
 
   updateScreen("System Ready");
 }
 
 void loop()
 {
-  handleScreenSaver();
+  //handleScreenSaver();
   // --- SVELTE DASHBOARD HEARTBEAT ---
   if (isWifiConnected)
   {

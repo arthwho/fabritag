@@ -1,6 +1,0 @@
-batches
-70B716E167D3EA	-	Lote sem produto	-	Câmara de Testes 1	2026-03-05 10:11:21
-79D24D05	-	Lote sem produto	-	Câmara de Testes 1	2026-03-05 12:37:40
-ABE06806	-	Lote sem produto	-	Câmara de Testes 1	2026-03-05 12:19:59
-EAC4B860	-	Lote sem produto	-	Câmara de Testes 1	2026-03-05 12:17:51
-

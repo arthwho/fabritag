@@ -28,7 +28,7 @@
 
 	// Grid calculations
 	const capacity = $derived(camara?.capacidade || 0);
-	
+
 	// Determine grid dimensions (try to keep it somewhat square or wider)
 	const cols = $derived(Math.ceil(Math.sqrt(capacity * 1.5)) || 1);
 	const rows = $derived(Math.ceil(capacity / cols) || 0);
@@ -36,12 +36,12 @@
 	// Map lotes to positions based on their quantity (size) and stored posicao_vaga
 	const lotesWithPositions = $derived.by(() => {
 		if (!camara?.lotes) return [];
-		
+
 		return camara.lotes.map((lote) => {
 			const startPos = lote.posicao_vaga ?? 0;
 			const quantity = Math.max(1, Math.floor(lote.quantidade || 1));
 			const endPos = startPos + quantity - 1;
-			
+
 			// Generate position string (e.g., "A1" or "A1-B1")
 			const getPosStr = (idx: number) => {
 				const r = Math.floor(idx / cols) + 1;
@@ -54,16 +54,15 @@
 				quantity,
 				startPos,
 				endPos,
-				posicao: quantity > 1 
-					? `${getPosStr(startPos)} - ${getPosStr(endPos)}`
-					: getPosStr(startPos)
+				posicao:
+					quantity > 1 ? `${getPosStr(startPos)} - ${getPosStr(endPos)}` : getPosStr(startPos)
 			};
 		});
 	});
 
 	const occupiedPositions = $derived.by(() => {
 		const map = new Map();
-		lotesWithPositions.forEach(lote => {
+		lotesWithPositions.forEach((lote) => {
 			for (let i = lote.startPos; i <= lote.endPos; i++) {
 				map.set(i, lote);
 			}
@@ -82,37 +81,39 @@
 </script>
 
 <div class="p-6">
-	<a href="/infraestrutura" class="mb-6 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-500 transition-colors">
-		<ChevronLeftOutline class="w-4 h-4" />
+	<a
+		href="/infraestrutura"
+		class="mb-6 inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-500"
+	>
+		<ChevronLeftOutline class="h-4 w-4" />
 		Voltar para Infraestrutura
 	</a>
 
 	{#if error}
-		<div class="rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-gray-800 dark:text-red-400 border border-red-200" role="alert">
+		<div
+			class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:bg-gray-800 dark:text-red-400"
+			role="alert"
+		>
 			{error}
 		</div>
 	{:else if camara}
 		<div class="mb-8">
 			<h1 class="h1 text-gray-900 dark:text-white">{camara.nome}</h1>
-			<p class="text-gray-500 dark:text-gray-400 mt-1">ID: {camara.id} • Prédio: {camara.predio}</p>
+			<p class="mt-1 text-gray-500 dark:text-gray-400">ID: {camara.id} • Prédio: {camara.predio}</p>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-			<InfoCard 
-				title="Capacidade" 
-				description="Total de vagas físicas" 
-				value={camara.capacidade || 'N/A'} 
+		<div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+			<InfoCard
+				title="Capacidade"
+				description="Total de vagas físicas"
+				value={camara.capacidade || 'N/A'}
 			/>
-			<InfoCard 
-				title="Ocupação" 
-				description="Espaços físicos ocupados" 
-				value={`${numOccupiedSpaces} / ${capacity}`} 
+			<InfoCard
+				title="Ocupação"
+				description="Espaços físicos ocupados"
+				value={`${numOccupiedSpaces} / ${capacity}`}
 			/>
-			<InfoCard 
-				title="Status" 
-				description="Estado de operação" 
-				value="Operacional"
-			>
+			<InfoCard title="Status" description="Estado de operação" value="Operacional">
 				{#snippet badge()}
 					<Badge color="green" class="rounded-full">Ativo</Badge>
 				{/snippet}
@@ -120,47 +121,62 @@
 		</div>
 
 		<!-- 2D Grid Representation -->
-		<div class="mb-10 bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-300 dark:border-gray-700">
-			<div class="flex items-center justify-between mb-6">
+		<div
+			class="mb-10 rounded-xl border border-gray-300 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+		>
+			<div class="mb-6 flex items-center justify-between">
 				<div>
 					<h2 class="text-lg font-bold text-gray-900 dark:text-white">Mapa de Ocupação</h2>
 					<p class="text-xs text-gray-500">Representação visual das prateleiras industriais</p>
 				</div>
 				<div class="flex gap-4 text-xs">
 					<div class="flex items-center gap-1.5">
-						<div class="w-3 h-3 bg-orange-500 rounded-sm"></div>
+						<div class="h-3 w-3 rounded-sm bg-orange-500"></div>
 						<span class="text-gray-600 dark:text-gray-400">Ocupado</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<div class="w-3 h-3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-sm"></div>
+						<div
+							class="h-3 w-3 rounded-sm border border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-700"
+						></div>
 						<span class="text-gray-600 dark:text-gray-400">Disponível</span>
 					</div>
 				</div>
 			</div>
 
 			<div class="overflow-x-auto pb-2">
-				<div class="inline-grid gap-2" style="grid-template-columns: auto repeat({cols}, minmax(40px, 1fr));">
+				<div
+					class="inline-grid gap-2"
+					style="grid-template-columns: auto repeat({cols}, minmax(40px, 1fr));"
+				>
 					<!-- Header Row (Columns A, B, C...) -->
 					<div class="w-8"></div>
 					{#each Array(cols) as _, c}
-						<div class="text-center text-[10px] font-bold text-gray-400 uppercase">{getColumnLetter(c + 1)}</div>
+						<div class="text-center text-[10px] font-bold text-gray-400 uppercase">
+							{getColumnLetter(c + 1)}
+						</div>
 					{/each}
 
 					<!-- Grid Rows -->
 					{#each Array(rows) as _, r}
 						<!-- Row Label (1, 2, 3...) -->
-						<div class="flex items-center justify-end pr-2 text-[10px] font-bold text-gray-400">{r + 1}</div>
-						
+						<div class="flex items-center justify-end pr-2 text-[10px] font-bold text-gray-400">
+							{r + 1}
+						</div>
+
 						{#each Array(cols) as _, c}
 							{@const cellIndex = r * cols + c}
 							{@const occupant = getOccupant(r + 1, c + 1)}
 							{#if cellIndex < capacity}
-								<div 
-									class="aspect-square rounded-md border flex items-center justify-center transition-all duration-200 {occupant ? 'bg-orange-500 border-orange-600 shadow-sm' : 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-600'}"
-									title={occupant ? `Lote: ${occupant.epc_tag}\nPosição: ${getColumnLetter(c + 1)}${r + 1}` : `Posição ${getColumnLetter(c + 1)}${r + 1}: Disponível`}
+								<div
+									class="flex aspect-square items-center justify-center rounded-md border transition-all duration-200 {occupant
+										? 'border-orange-600 bg-orange-500 shadow-sm'
+										: 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/30'}"
+									title={occupant
+										? `Lote: ${occupant.epc_tag}\nPosição: ${getColumnLetter(c + 1)}${r + 1}`
+										: `Posição ${getColumnLetter(c + 1)}${r + 1}: Disponível`}
 								>
 									{#if occupant}
-										<div class="w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse"></div>
+										<div class="h-1.5 w-1.5 animate-pulse rounded-full bg-white/40"></div>
 									{/if}
 								</div>
 							{:else}
@@ -172,10 +188,17 @@
 			</div>
 		</div>
 
-		<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-300 dark:border-gray-700 overflow-hidden shadow-none">
-			<div class="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+		<div
+			class="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-none dark:border-gray-700 dark:bg-gray-800"
+		>
+			<div
+				class="flex items-center justify-between border-b border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-800/50"
+			>
 				<h2 class="text-lg font-bold text-gray-900 dark:text-white">Lotes Presentes na Câmara</h2>
-				<span class="text-xs font-medium text-gray-500 bg-gray-200 dark:bg-gray-700 px-2.5 py-1 rounded-md">{camara.lotes.length} Lotes</span>
+				<span
+					class="rounded-md bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-gray-700"
+					>{camara.lotes.length} Lotes</span
+				>
 			</div>
 			<Table hoverable={true} shadow={false} divClass="overflow-x-auto">
 				<TableHead class="bg-gray-50 dark:bg-gray-700">
@@ -195,11 +218,20 @@
 							<TableBodyCell>
 								<span class="text-sm text-gray-600 dark:text-gray-400">{lote.quantity}</span>
 							</TableBodyCell>
-							<TableBodyCell class="font-mono text-xs text-gray-600 dark:text-gray-400">{lote.epc_tag}</TableBodyCell>
-							<TableBodyCell class="font-medium text-gray-900 dark:text-white">{lote.produto}</TableBodyCell>
-							<TableBodyCell class="text-gray-600 dark:text-gray-400">{lote.data_entrada}</TableBodyCell>
+							<TableBodyCell class="font-mono text-xs text-gray-600 dark:text-gray-400"
+								>{lote.epc_tag}</TableBodyCell
+							>
+							<TableBodyCell class="font-medium text-gray-900 dark:text-white"
+								>{lote.produto}</TableBodyCell
+							>
+							<TableBodyCell class="text-gray-600 dark:text-gray-400"
+								>{lote.data_entrada}</TableBodyCell
+							>
 							<TableBodyCell class="text-right">
-								<a href={`/movimentacao?search=${lote.epc_tag}`} class="font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 transition-colors">
+								<a
+									href={`/movimentacao?search=${lote.epc_tag}`}
+									class="font-semibold text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400"
+								>
 									Ver Histórico
 								</a>
 							</TableBodyCell>
@@ -216,18 +248,8 @@
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center p-20">
-			<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div>
-			<p class="text-gray-500 animate-pulse">Carregando detalhes da câmara...</p>
+			<div class="mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-orange-600"></div>
+			<p class="animate-pulse text-gray-500">Carregando detalhes da câmara...</p>
 		</div>
 	{/if}
 </div>
-
-<style>
-	.h1 {
-		font-size: 32px;
-		font-family: Inter, sans-serif;
-		font-weight: 800;
-		line-height: 1.2;
-		letter-spacing: -0.02em;
-	}
-</style>
