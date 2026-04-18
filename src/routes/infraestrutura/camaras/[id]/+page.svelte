@@ -14,6 +14,7 @@
 	let { data } = $props();
 	const camara = $derived(data.camara);
 	const error = $derived(data.error);
+	const warning = $derived(data.camara?.warning || null);
 
 	// Helper to convert number to Excel-style column (A, B, C... Z, AA, AB...)
 	function getColumnLetter(n: number): string {
@@ -39,7 +40,7 @@
 
 		return camara.lotes.map((lote) => {
 			const startPos = lote.posicao_vaga ?? 0;
-			const quantity = Math.max(1, Math.floor(lote.quantidade || 1));
+			const quantity = Math.max(1, Math.ceil(lote.quantidade || 1));
 			const endPos = startPos + quantity - 1;
 
 			// Generate position string (e.g., "A1" or "A1-B1")
@@ -102,6 +103,15 @@
 			<p class="mt-1 text-gray-500 dark:text-gray-400">ID: {camara.id} • Prédio: {camara.predio}</p>
 		</div>
 
+		{#if warning}
+			<div
+				class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-gray-800 dark:text-amber-300"
+				role="alert"
+			>
+				{warning}
+			</div>
+		{/if}
+
 		<div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
 			<InfoCard
 				title="Capacidade"
@@ -111,7 +121,7 @@
 			<InfoCard
 				title="Ocupação"
 				description="Espaços físicos ocupados"
-				value={`${numOccupiedSpaces} / ${capacity}`}
+				value={`${camara.ocupacao_total ?? numOccupiedSpaces} / ${capacity}`}
 			/>
 			<InfoCard title="Status" description="Estado de operação" value="Operacional">
 				{#snippet badge()}

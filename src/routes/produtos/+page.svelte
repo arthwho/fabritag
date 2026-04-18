@@ -38,6 +38,13 @@
 		cpf_cnpj?: string | null;
 	};
 
+	type CamaraOption = {
+		id: number;
+		nome: string;
+	};
+
+	type CamaraPayload = CamaraOption[] | { value?: CamaraOption[] } | null | undefined;
+
 	type LoteRow = {
 		id?: string;
 		epc_tag: string;
@@ -48,7 +55,6 @@
 		produto_assoc?: Array<{
 			produto_tipo_id: number;
 			produto_nome: string;
-			produto_unidade_medida: string | null;
 			quantidade: number;
 		}>;
 		nome?: string;
@@ -57,8 +63,16 @@
 		local_desde: string | null;
 	};
 
+	function normalizeCamaras(payload: CamaraPayload): CamaraOption[] {
+		if (Array.isArray(payload)) return payload;
+		if (payload && Array.isArray(payload.value)) return payload.value;
+		return [];
+	}
+
 	let produtos = $derived((data.produtos || []) as ProdutoRow[]);
 	let clientes = $derived((data.clientes || []) as ClienteOption[]);
+	let camarasFallback = $state<CamaraOption[] | null>(null);
+	let camaras = $derived(camarasFallback ?? normalizeCamaras(data.camaras as CamaraPayload));
 	let lotes = $derived((data.lotes || []) as LoteRow[]);
 	let lotesSemProduto = $derived(data.lotesSemProduto || []);
 	let activeSection = $state<'produtos' | 'lotes'>('produtos');
@@ -66,8 +80,11 @@
 	let searchLotes = $state('');
 	let isProdutoModalOpen = $state(false);
 	let isLoteModalOpen = $state(false);
+	let isMoveLoteModalOpen = $state(false);
 	let editingProdutoId = $state<number | null>(null);
 	let editingLoteEpcTag = $state('');
+	let movingLoteEpcTag = $state('');
+	let moveDestinoCamaraId = $state('');
 	let isSubmitting = $state(false);
 	let formError = $state('');
 	let produtoClienteId = $state('');
@@ -75,12 +92,14 @@
 	let produtoSku = $state('');
 	let produtoUnidadeMedida = $state('');
 	let loteProdutoTipoIds = $state<string[]>([]);
+	let loteProdutoSearch = $state('');
 	let loteQuantidades = $state<Record<string, string>>({});
 
 	let produtoModalTitle = $derived(editingProdutoId ? 'Editar Produto' : 'Adicionar Produto');
 	let produtoSubmitLabel = $derived(editingProdutoId ? 'Salvar alterações' : 'Salvar');
 	let loteModalTitle = $derived('Editar Lote');
 	let loteSubmitLabel = $derived('Salvar alterações');
+	let moveLoteModalTitle = $derived('Movimentar lote');
 
 	const normalize = (str: string) =>
 		str
@@ -99,9 +118,6 @@
 		{ value: 'g', label: 'Massa: Grama (g)' },
 		{ value: 'mg', label: 'Massa: Miligrama (mg)' },
 		{ value: 't', label: 'Massa: Tonelada (t)' },
-		{ value: 's', label: 'Tempo: Segundo (s)' },
-		{ value: 'min', label: 'Tempo: Minuto (min)' },
-		{ value: 'h', label: 'Tempo: Hora (h)' },
 		{ value: 'l', label: 'Capacidade/Volume: Litro (L)' },
 		{ value: 'ml', label: 'Capacidade/Volume: Mililitro (mL)' },
 		{ value: 'm3', label: 'Capacidade/Volume: Metro cubico (m3)' },
@@ -126,6 +142,19 @@
 		lotes.filter((item) => {
 			const search = normalize(searchLotes);
 			return Object.values(item).some((val) => normalize((val ?? '').toString()).includes(search));
+		})
+	);
+
+	let filteredProdutosForLoteSelect = $derived(
+		produtos.filter((produto) => {
+			const id = produto.id.toString();
+			if (loteProdutoTipoIds.includes(id)) return true;
+
+			const search = normalize(loteProdutoSearch);
+			if (!search) return true;
+
+			const haystack = `${produto.id} ${produto.nome} ${produto.sku || ''}`;
+			return normalize(haystack).includes(search);
 		})
 	);
 
@@ -296,7 +325,34 @@
 			}
 		}
 		loteQuantidades = quantitiesById;
+		loteProdutoSearch = '';
 		isLoteModalOpen = true;
+	}
+
+	async function openMoveLoteModal() {
+		if (!editingLoteEpcTag) return;
+		resetProdutoForm();
+
+		if (camaras.length === 0) {
+			try {
+				const response = await fetch('http://127.0.0.1:5000/api/camaras');
+				if (response.ok) {
+					const payload = (await response.json()) as CamaraPayload;
+					camarasFallback = normalizeCamaras(payload);
+				}
+			} catch {
+				// Keep default error handling below.
+			}
+		}
+
+		if (camaras.length === 0) {
+			formError = 'Nenhuma câmara disponível para movimentação.';
+			return;
+		}
+
+		movingLoteEpcTag = editingLoteEpcTag;
+		moveDestinoCamaraId = '';
+		isMoveLoteModalOpen = true;
 	}
 
 	function syncLoteQuantidades() {
@@ -317,14 +373,6 @@
 		return produto?.unidade_medida || null;
 	}
 
-	function getQuantidadeStepForProduto(id: string) {
-		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
-	}
-
-	function getQuantidadeMinForProduto(id: string) {
-		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
-	}
-
 	function getStepForProduto(id: string) {
 		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
 	}
@@ -337,52 +385,80 @@
 		event.preventDefault();
 		if (!editingLoteEpcTag) return;
 
-		try {
-			const produtoTipoIds = loteProdutoTipoIds
-				.map((value) => Number(value))
-				.filter((value) => Number.isInteger(value) && value > 0);
+		const produtoTipoIds = loteProdutoTipoIds
+			.map((value) => Number(value))
+			.filter((value) => Number.isInteger(value) && value > 0);
 
-			if (produtoTipoIds.length === 0) {
-				formError = 'Selecione ao menos um produto.';
-				return;
+		if (produtoTipoIds.length === 0) {
+			formError = 'Selecione ao menos um produto.';
+			return;
+		}
+
+		const produtoAssoc = loteProdutoTipoIds.map((idValue) => {
+			const produtoTipoId = Number(idValue);
+			const quantidade = Number(loteQuantidades[idValue]);
+
+			if (!Number.isFinite(quantidade) || quantidade <= 0) {
+				throw new Error(`Informe uma quantidade válida para ${getProdutoNomeById(idValue)}.`);
 			}
 
-			const produtoAssoc = loteProdutoTipoIds.map((idValue) => {
-				const produtoTipoId = Number(idValue);
-				const quantidade = Number(loteQuantidades[idValue]);
-
-				if (!Number.isFinite(quantidade) || quantidade <= 0) {
-					throw new Error(`Informe uma quantidade válida para ${getProdutoNomeById(idValue)}.`);
-				}
-
-				if (isUnidadeInteira(getProdutoUnidadeById(idValue)) && !Number.isInteger(quantidade)) {
-					throw new Error(`Para ${getProdutoNomeById(idValue)}, informe um valor inteiro.`);
-				}
-
-				return {
-					produto_tipo_id: produtoTipoId,
-					quantidade
-				};
-			});
-
-			const success = await runProdutoMutation(
-				`http://127.0.0.1:5000/api/lotes/${editingLoteEpcTag}`,
-				{
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						produto_assoc: produtoAssoc
-					})
-				},
-				'Não foi possível atualizar o lote.'
-			);
-
-			if (success) {
-				isLoteModalOpen = false;
-				editingLoteEpcTag = '';
+			if (isUnidadeInteira(getProdutoUnidadeById(idValue)) && !Number.isInteger(quantidade)) {
+				throw new Error(`Para ${getProdutoNomeById(idValue)}, informe um valor inteiro.`);
 			}
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Não foi possível atualizar o lote.';
+
+			return {
+				produto_tipo_id: produtoTipoId,
+				quantidade
+			};
+		});
+
+		const success = await runProdutoMutation(
+			`http://127.0.0.1:5000/api/lotes/${editingLoteEpcTag}`,
+			{
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					produto_assoc: produtoAssoc
+				})
+			},
+			'Não foi possível atualizar o lote.'
+		);
+
+		if (success) {
+			isLoteModalOpen = false;
+			editingLoteEpcTag = '';
+		}
+	}
+
+	async function moveLote(event: SubmitEvent) {
+		event.preventDefault();
+		resetProdutoForm();
+
+		if (!movingLoteEpcTag) return;
+
+		const camaraId = Number(moveDestinoCamaraId);
+		if (!Number.isInteger(camaraId) || camaraId <= 0) {
+			formError = 'Selecione uma câmara de destino válida.';
+			return;
+		}
+
+		const success = await runProdutoMutation(
+			`http://127.0.0.1:5000/api/lotes/${movingLoteEpcTag}/movimentar`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					camara_id: camaraId
+				})
+			},
+			'Não foi possível movimentar o lote.'
+		);
+
+		if (success) {
+			isMoveLoteModalOpen = false;
+			isLoteModalOpen = false;
+			movingLoteEpcTag = '';
+			editingLoteEpcTag = '';
 		}
 	}
 </script>
@@ -532,7 +608,7 @@
 						<TableBodyCell>
 							{#if lote.produto_assoc && lote.produto_assoc.length > 0}
 								{#each lote.produto_assoc as assoc, idx}
-										{assoc.produto_nome} ({assoc.quantidade} {assoc.produto_unidade_medida || ''}){idx < lote.produto_assoc.length - 1
+									{assoc.produto_nome} ({assoc.quantidade}){idx < lote.produto_assoc.length - 1
 										? ', '
 										: ''}
 								{/each}
@@ -614,14 +690,22 @@
 			</div>
 			<div>
 				<Label for="lote-produto">Produtos associados</Label>
+				<Input
+					id="lote-produto-search"
+					placeholder="Pesquisar produto por ID, nome ou SKU..."
+					bind:value={loteProdutoSearch}
+					class="mb-2"
+				/>
 				<Select
 					id="lote-produto"
 					bind:value={loteProdutoTipoIds}
 					multiple
 					onchange={syncLoteQuantidades}
 				>
-					{#each produtos as produto}
-						<option value={produto.id.toString()}>{produto.nome}</option>
+					{#each filteredProdutosForLoteSelect as produto}
+						<option value={produto.id.toString()}>
+							{produto.id} - {produto.nome}{produto.sku ? ` (${produto.sku})` : ''}
+						</option>
 					{/each}
 				</Select>
 				<p class="mt-1 text-xs text-gray-500">
@@ -636,8 +720,8 @@
 							<p class="text-sm text-gray-700">{getProdutoNomeById(produtoId)}</p>
 							<Input
 								type="number"
-									min={getQuantidadeMinForProduto(produtoId)}
-									step={getQuantidadeStepForProduto(produtoId)}
+								min={getMinForProduto(produtoId)}
+								step={getStepForProduto(produtoId)}
 								bind:value={loteQuantidades[produtoId]}
 								required
 							/>
@@ -648,11 +732,45 @@
 			{#if formError}
 				<p class="text-sm text-red-600">{formError}</p>
 			{/if}
+			<div class="flex items-center justify-between gap-2">
+				<Button type="button" color="dark" outline onclick={openMoveLoteModal}>
+					Movimentar lote
+				</Button>
+				<div class="flex justify-end gap-2">
+					<Button type="button" color="light" onclick={() => (isLoteModalOpen = false)}>
+						Cancelar
+					</Button>
+					<Button type="submit" color="orange" disabled={isSubmitting}>{loteSubmitLabel}</Button>
+				</div>
+			</div>
+		</form>
+	</Modal>
+
+	<Modal bind:open={isMoveLoteModalOpen} title={moveLoteModalTitle} size="md">
+		<form class="space-y-4" onsubmit={moveLote}>
+			<div>
+				<Label for="move-lote-epc">EPC Tag</Label>
+				<Input id="move-lote-epc" value={movingLoteEpcTag} disabled />
+			</div>
+			<div>
+				<Label for="move-lote-camara">Destino (Câmara)</Label>
+				<Select id="move-lote-camara" bind:value={moveDestinoCamaraId} required>
+					<option value="">Selecione uma câmara</option>
+					{#each camaras as camara}
+						<option value={camara.id.toString()}>
+							{camara.id} - {camara.nome}
+						</option>
+					{/each}
+				</Select>
+			</div>
+			{#if formError}
+				<p class="text-sm text-red-600">{formError}</p>
+			{/if}
 			<div class="flex justify-end gap-2">
-				<Button type="button" color="light" onclick={() => (isLoteModalOpen = false)}>
+				<Button type="button" color="light" onclick={() => (isMoveLoteModalOpen = false)}>
 					Cancelar
 				</Button>
-				<Button type="submit" color="orange" disabled={isSubmitting}>{loteSubmitLabel}</Button>
+				<Button type="submit" color="orange" disabled={isSubmitting}>Movimentar lote</Button>
 			</div>
 		</form>
 	</Modal>

@@ -1,4 +1,5 @@
 import os
+import math
 import psycopg2
 from psycopg2 import pool
 from dotenv import load_dotenv
@@ -29,6 +30,56 @@ def get_db_connection():
 
 def release_db_connection(conn):
     db_pool.putconn(conn)
+
+def _batch_size_from_qty(qty):
+    try:
+        value = float(qty or 1)
+    except (TypeError, ValueError):
+        value = 1
+    return max(1, int(math.ceil(value)))
+
+def _camera_capacity(cur, camara_id):
+    cur.execute("SELECT capacidade_vagas FROM CAMARA WHERE id = %s", (camara_id,))
+    res = cur.fetchone()
+    if not res:
+        return 0
+    return res[0] or 100
+
+def _repack_open_movimentacoes(cur, camara_id, strict=True):
+    capacity = _camera_capacity(cur, camara_id)
+
+    cur.execute(
+        "SELECT m.id, m.epc_tag, COALESCE(l.quantidade_atual, 1), m.posicao_vaga "
+        "FROM MOVIMENTACAO m "
+        "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
+        "WHERE m.camara_id = %s AND m.data_saida IS NULL "
+        "ORDER BY m.data_entrada ASC, m.id ASC",
+        (camara_id,)
+    )
+    open_rows = cur.fetchall()
+
+    total_required = sum(_batch_size_from_qty(row[2]) for row in open_rows)
+    if strict and total_required > capacity:
+        raise ValueError(
+            f"Capacidade da câmara excedida: {total_required}/{capacity}. "
+            "Reduza a quantidade total dos produtos deste lote para salvar."
+        )
+
+    next_pos = 0
+    for mov_id, _, qty, current_pos in open_rows:
+        size = _batch_size_from_qty(qty)
+        if current_pos != next_pos:
+            cur.execute(
+                "UPDATE MOVIMENTACAO SET posicao_vaga = %s WHERE id = %s",
+                (next_pos, mov_id),
+            )
+        next_pos += size
+
+    return {
+        "capacity": capacity,
+        "total_required": total_required,
+        "over_capacity": total_required > capacity,
+    }
 
 def _ensure_lote_produto_assoc_table(cur):
     cur.execute(
@@ -166,6 +217,93 @@ def fetch_clientes():
             }
             for row in cur.fetchall()
         ]
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def create_cliente(cpf_cnpj=None, nome_razao_social=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        normalized_cpf_cnpj = (cpf_cnpj or '').strip() or None
+        normalized_nome = (nome_razao_social or '').strip() or None
+
+        cur.execute(
+            "INSERT INTO CLIENTE (cpf_cnpj, nome_razao_social) "
+            "VALUES (%s, %s) RETURNING id, cpf_cnpj, nome_razao_social",
+            (normalized_cpf_cnpj, normalized_nome)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row[0],
+            "cpf_cnpj": row[1],
+            "nome_razao_social": row[2],
+            "nome": row[2] or 'Cliente sem nome'
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def update_cliente(cliente_id, cpf_cnpj=None, nome_razao_social=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        normalized_cpf_cnpj = (cpf_cnpj or '').strip() or None
+        normalized_nome = (nome_razao_social or '').strip() or None
+
+        cur.execute(
+            "UPDATE CLIENTE SET cpf_cnpj = %s, nome_razao_social = %s "
+            "WHERE id = %s RETURNING id, cpf_cnpj, nome_razao_social",
+            (normalized_cpf_cnpj, normalized_nome, cliente_id)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("Cliente not found")
+
+        conn.commit()
+        return {
+            "id": row[0],
+            "cpf_cnpj": row[1],
+            "nome_razao_social": row[2],
+            "nome": row[2] or 'Cliente sem nome'
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
+def delete_cliente(cliente_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) FROM PRODUTO_TIPO WHERE cliente_id = %s", (cliente_id,))
+        if cur.fetchone()[0] > 0:
+            raise ValueError("Cannot delete cliente with existing produtos")
+
+        cur.execute("SELECT COUNT(*) FROM DISPOSITIVO WHERE cliente_id = %s", (cliente_id,))
+        if cur.fetchone()[0] > 0:
+            raise ValueError("Cannot delete cliente with existing dispositivos")
+
+        cur.execute("SELECT COUNT(*) FROM USUARIO WHERE cliente_id = %s", (cliente_id,))
+        if cur.fetchone()[0] > 0:
+            raise ValueError("Cannot delete cliente with existing usuarios")
+
+        cur.execute("DELETE FROM CLIENTE WHERE id = %s RETURNING id", (cliente_id,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError("Cliente not found")
+
+        conn.commit()
+        return {"id": row[0]}
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         release_db_connection(conn)
@@ -445,14 +583,18 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
                 # Get batch size
                 cur.execute("SELECT quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
                 qty_res = cur.fetchone()
-                batch_size = max(1, int(qty_res[0] or 1)) if qty_res else 1
+                batch_size = _batch_size_from_qty(qty_res[0]) if qty_res else 1
 
                 pos_vaga = _find_available_slot(cur, camara_id, batch_size)
+                if pos_vaga is None:
+                    conn.rollback()
+                    return False, "No available slots in camara"
 
                 cur.execute(
                     "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, posicao_vaga, data_entrada) VALUES (%s, %s, %s, NOW())",
                     (epc_tag, camara_id, pos_vaga)
                 )
+                _repack_open_movimentacoes(cur, camara_id)
         
         elif event == "REMOVED":
             cur.execute(
@@ -791,6 +933,16 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
         row = cur.fetchone()
 
         cur.execute(
+            "SELECT camara_id FROM MOVIMENTACAO "
+            "WHERE epc_tag = %s AND data_saida IS NULL "
+            "ORDER BY data_entrada DESC LIMIT 1",
+            (epc_tag,)
+        )
+        open_camara = cur.fetchone()
+        if open_camara:
+            _repack_open_movimentacoes(cur, open_camara[0])
+
+        cur.execute(
             "SELECT lp.produto_tipo_id, COALESCE(pt.nome, 'Produto sem nome'), lp.quantidade "
             "FROM LOTE_PRODUTO_ASSOC lp "
             "LEFT JOIN PRODUTO_TIPO pt ON pt.id = lp.produto_tipo_id "
@@ -823,6 +975,68 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
         cur.close()
         release_db_connection(conn)
 
+def move_lote_to_camara(epc_tag, camara_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
+        lote_row = cur.fetchone()
+        if not lote_row:
+            raise ValueError("Lote not found")
+
+        cur.execute("SELECT 1 FROM CAMARA WHERE id = %s", (camara_id,))
+        if not cur.fetchone():
+            raise ValueError("Camara not found")
+
+        cur.execute(
+            "SELECT id, camara_id FROM MOVIMENTACAO "
+            "WHERE epc_tag = %s AND data_saida IS NULL "
+            "ORDER BY data_entrada DESC, id DESC LIMIT 1",
+            (epc_tag,)
+        )
+        open_mov = cur.fetchone()
+
+        origem_camara_id = None
+        if open_mov:
+            origem_mov_id = open_mov[0]
+            origem_camara_id = open_mov[1]
+
+            if origem_camara_id == camara_id:
+                raise ValueError("Lote already in destination camara")
+
+            cur.execute("UPDATE MOVIMENTACAO SET data_saida = NOW() WHERE id = %s", (origem_mov_id,))
+            _repack_open_movimentacoes(cur, origem_camara_id, strict=False)
+
+        batch_size = _batch_size_from_qty(lote_row[0])
+        pos_vaga = _find_available_slot(cur, camara_id, batch_size)
+        if pos_vaga is None:
+            raise ValueError("No available slots in camara")
+
+        cur.execute(
+            "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, posicao_vaga, data_entrada) VALUES (%s, %s, %s, NOW()) "
+            "RETURNING id, data_entrada",
+            (epc_tag, camara_id, pos_vaga)
+        )
+        mov_row = cur.fetchone()
+
+        _repack_open_movimentacoes(cur, camara_id)
+
+        conn.commit()
+        return {
+            "movimentacao_id": mov_row[0],
+            "epc_tag": epc_tag,
+            "camara_origem_id": origem_camara_id,
+            "camara_destino_id": camara_id,
+            "posicao_vaga": pos_vaga,
+            "data_entrada": mov_row[1].strftime("%Y-%m-%d %H:%M:%S") if mov_row[1] else None
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_db_connection(conn)
+
 def fetch_camara_detalhes(camara_id):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -846,6 +1060,8 @@ def fetch_camara_detalhes(camara_id):
             "capacidade": camara_row[3]
         }
 
+        pack_info = _repack_open_movimentacoes(cur, camara_id, strict=False)
+
         # Get batches currently in this camara
         cur.execute(
             "SELECT m.epc_tag, pt.nome, m.data_entrada, l.quantidade_atual, m.posicao_vaga "
@@ -867,6 +1083,10 @@ def fetch_camara_detalhes(camara_id):
             })
         
         camara_info["lotes"] = batches
+        camara_info["ocupacao_total"] = pack_info["total_required"]
+        camara_info["over_capacity"] = pack_info["over_capacity"]
+        if pack_info["over_capacity"]:
+            camara_info["warning"] = f"Capacidade excedida: {pack_info['total_required']}/{pack_info['capacity']}"
         return camara_info
     finally:
         cur.close()
@@ -874,10 +1094,7 @@ def fetch_camara_detalhes(camara_id):
 
 def _find_available_slot(cur, camara_id, batch_size):
     # 1. Get capacity
-    cur.execute("SELECT capacidade_vagas FROM CAMARA WHERE id = %s", (camara_id,))
-    res = cur.fetchone()
-    if not res: return 0
-    capacity = res[0] or 100
+    capacity = _camera_capacity(cur, camara_id)
 
     # 2. Get current occupancy (open movimentacoes)
     cur.execute(
@@ -890,7 +1107,7 @@ def _find_available_slot(cur, camara_id, batch_size):
     
     occupied = [False] * capacity
     for pos_vaga, qty in cur.fetchall():
-        q = max(1, int(qty or 1))
+        q = _batch_size_from_qty(qty)
         for i in range(pos_vaga, min(pos_vaga + q, capacity)):
             occupied[i] = True
 

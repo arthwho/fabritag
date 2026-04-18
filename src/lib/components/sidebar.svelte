@@ -87,13 +87,7 @@
 		border
 		borderClass="space-y-2 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700"
 	>
-		<SidebarItem
-			label="Movimentar lote"
-			href="/movimentacao"
-			{spanClass}
-			{activeClass}
-			{nonActiveClass}
-		>
+		<SidebarItem label="Clientes" href="/clientes" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
 				<ArrowRightLeft
 					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"

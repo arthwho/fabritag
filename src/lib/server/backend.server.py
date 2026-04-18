@@ -7,8 +7,17 @@ CORS(app)
 
 
 def value_error_status(message):
-    if message.startswith("Cannot delete"):
+    normalized = (message or "").lower()
+    if normalized.startswith("cannot delete"):
         return 409
+    if "capacity exceeded" in normalized or ("capacidade" in normalized and "excedida" in normalized):
+        return 409
+    if "no available slots" in normalized or "already in destination" in normalized:
+        return 409
+    if "missing required field" in normalized or "invalid" in normalized:
+        return 400
+    if "devem usar quantidade inteira" in normalized:
+        return 400
     return 404
 
 # --- ROUTES ---
@@ -31,6 +40,54 @@ def get_clientes():
     try:
         clientes = db.fetch_clientes()
         return jsonify(clientes)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/clientes', methods=['POST'])
+def create_cliente():
+    data = request.json or {}
+    cpf_cnpj = data.get('cpf_cnpj')
+    nome_razao_social = data.get('nome_razao_social')
+
+    try:
+        cliente = db.create_cliente(
+            cpf_cnpj=cpf_cnpj,
+            nome_razao_social=nome_razao_social
+        )
+        return jsonify(cliente), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/clientes/<int:cliente_id>', methods=['PUT'])
+def update_cliente(cliente_id):
+    data = request.json or {}
+    cpf_cnpj = data.get('cpf_cnpj')
+    nome_razao_social = data.get('nome_razao_social')
+
+    try:
+        cliente = db.update_cliente(
+            cliente_id=cliente_id,
+            cpf_cnpj=cpf_cnpj,
+            nome_razao_social=nome_razao_social
+        )
+        return jsonify(cliente), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/clientes/<int:cliente_id>', methods=['DELETE'])
+def delete_cliente(cliente_id):
+    try:
+        result = db.delete_cliente(cliente_id=cliente_id)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -160,6 +217,31 @@ def update_lote(epc_tag):
             produto_assoc=produto_assoc
         )
         return jsonify(lote), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/lotes/<string:epc_tag>/movimentar', methods=['POST'])
+def move_lote(epc_tag):
+    data = request.json or {}
+    camara_id = data.get('camara_id')
+
+    if camara_id in ('', None):
+        return jsonify({"error": "Missing required field: camara_id"}), 400
+
+    try:
+        camara_id = int(camara_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid field: camara_id"}), 400
+
+    if camara_id <= 0:
+        return jsonify({"error": "Invalid field: camara_id"}), 400
+
+    try:
+        movimentacao = db.move_lote_to_camara(epc_tag=epc_tag, camara_id=camara_id)
+        return jsonify(movimentacao), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), value_error_status(str(e))
     except Exception as e:
