@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import {
 		Button,
 		Input,
@@ -17,10 +18,10 @@
 	import InfoCard from '$lib/components/InfoCard.svelte';
 	import TableActions from '$lib/components/TableActions.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
-	import { invalidateAll } from '$app/navigation';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { fly } from 'svelte/transition';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	type ProdutoRow = {
 		id: number;
@@ -43,8 +44,6 @@
 		nome: string;
 	};
 
-	type CamaraPayload = CamaraOption[] | { value?: CamaraOption[] } | null | undefined;
-
 	type LoteRow = {
 		id?: string;
 		epc_tag: string;
@@ -63,16 +62,23 @@
 		local_desde: string | null;
 	};
 
-	function normalizeCamaras(payload: CamaraPayload): CamaraOption[] {
-		if (Array.isArray(payload)) return payload;
-		if (payload && Array.isArray(payload.value)) return payload.value;
-		return [];
-	}
+	type ActionResultPayload = {
+		action?: 'createProduto' | 'updateProduto' | 'deleteProduto' | 'updateLote' | 'moveLote';
+		success?: boolean;
+		error?: string;
+		fieldValues?: {
+			clienteId?: string;
+			nome?: string;
+			sku?: string;
+			unidadeMedida?: string;
+			loteProdutoTipoIds?: string[];
+			loteQuantidades?: Record<string, string>;
+		};
+	};
 
 	let produtos = $derived((data.produtos || []) as ProdutoRow[]);
 	let clientes = $derived((data.clientes || []) as ClienteOption[]);
-	let camarasFallback = $state<CamaraOption[] | null>(null);
-	let camaras = $derived(camarasFallback ?? normalizeCamaras(data.camaras as CamaraPayload));
+	let camaras = $derived((data.camaras || []) as CamaraOption[]);
 	let lotes = $derived((data.lotes || []) as LoteRow[]);
 	let lotesSemProduto = $derived(data.lotesSemProduto || []);
 	let activeSection = $state<'produtos' | 'lotes'>('produtos');
@@ -94,6 +100,9 @@
 	let loteProdutoTipoIds = $state<string[]>([]);
 	let loteProdutoSearch = $state('');
 	let loteQuantidades = $state<Record<string, string>>({});
+	let deleteProdutoForms = $state<Record<number, HTMLFormElement | undefined>>({});
+
+	let actionResult = $derived((form || null) as ActionResultPayload | null);
 
 	let produtoModalTitle = $derived(editingProdutoId ? 'Editar Produto' : 'Adicionar Produto');
 	let produtoSubmitLabel = $derived(editingProdutoId ? 'Salvar alterações' : 'Salvar');
@@ -185,118 +194,10 @@
 		isProdutoModalOpen = true;
 	}
 
-	async function runProdutoMutation(url: string, options: RequestInit, fallbackError: string) {
-		resetProdutoForm();
-		isSubmitting = true;
-
-		try {
-			const response = await fetch(url, options);
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || fallbackError);
-			}
-
-			await invalidateAll();
-			return true;
-		} catch (error) {
-			formError = error instanceof Error ? error.message : fallbackError;
-			return false;
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function handleDeleteProduto(produtoId: number) {
+	function handleDeleteProduto(produtoId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este produto?')) return;
 
-		await runProdutoMutation(
-			`http://127.0.0.1:5000/api/produtos/${produtoId}`,
-			{ method: 'DELETE' },
-			'Não foi possível excluir o produto.'
-		);
-	}
-
-	async function createProduto(event: SubmitEvent) {
-		event.preventDefault();
-		resetProdutoForm();
-
-		const nome = produtoNome.trim();
-		if (!nome) {
-			formError = 'O nome do produto é obrigatório.';
-			return;
-		}
-
-		const clienteIdInput = String(produtoClienteId ?? '').trim();
-		const clienteId = clienteIdInput ? Number(clienteIdInput) : null;
-		if (clienteIdInput && (!Number.isInteger(clienteId) || Number(clienteId) < 1)) {
-			formError = 'Informe um cliente válido.';
-			return;
-		}
-
-		const success = await runProdutoMutation(
-			'http://127.0.0.1:5000/api/produtos',
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					cliente_id: clienteId,
-					nome,
-					sku: produtoSku.trim() || null,
-					unidade_medida: produtoUnidadeMedida || null
-				})
-			},
-			'Não foi possível criar o produto.'
-		);
-
-		if (success) {
-			isProdutoModalOpen = false;
-		}
-	}
-
-	async function updateProduto(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingProdutoId) return;
-
-		const nome = produtoNome.trim();
-		if (!nome) {
-			formError = 'O nome do produto é obrigatório.';
-			return;
-		}
-
-		const clienteIdInput = String(produtoClienteId ?? '').trim();
-		const clienteId = clienteIdInput ? Number(clienteIdInput) : null;
-		if (clienteIdInput && (!Number.isInteger(clienteId) || Number(clienteId) < 1)) {
-			formError = 'Informe um cliente válido.';
-			return;
-		}
-
-		const success = await runProdutoMutation(
-			`http://127.0.0.1:5000/api/produtos/${editingProdutoId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					cliente_id: clienteId,
-					nome,
-					sku: produtoSku.trim() || null,
-					unidade_medida: produtoUnidadeMedida || null
-				})
-			},
-			'Não foi possível atualizar o produto.'
-		);
-
-		if (success) {
-			isProdutoModalOpen = false;
-			editingProdutoId = null;
-		}
-	}
-
-	async function submitProdutoForm(event: SubmitEvent) {
-		if (editingProdutoId) {
-			await updateProduto(event);
-			return;
-		}
-		await createProduto(event);
+		deleteProdutoForms[produtoId]?.requestSubmit();
 	}
 
 	function handleEditLote(epcTag: string) {
@@ -329,21 +230,9 @@
 		isLoteModalOpen = true;
 	}
 
-	async function openMoveLoteModal() {
+	function openMoveLoteModal() {
 		if (!editingLoteEpcTag) return;
 		resetProdutoForm();
-
-		if (camaras.length === 0) {
-			try {
-				const response = await fetch('http://127.0.0.1:5000/api/camaras');
-				if (response.ok) {
-					const payload = (await response.json()) as CamaraPayload;
-					camarasFallback = normalizeCamaras(payload);
-				}
-			} catch {
-				// Keep default error handling below.
-			}
-		}
 
 		if (camaras.length === 0) {
 			formError = 'Nenhuma câmara disponível para movimentação.';
@@ -381,86 +270,144 @@
 		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
 	}
 
-	async function updateLote(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingLoteEpcTag) return;
+	function buildProdutoAssocJson() {
+		const produtoAssoc = loteProdutoTipoIds.map((idValue) => ({
+			produto_tipo_id: Number(idValue),
+			quantidade: Number(loteQuantidades[idValue])
+		}));
 
-		const produtoTipoIds = loteProdutoTipoIds
-			.map((value) => Number(value))
-			.filter((value) => Number.isInteger(value) && value > 0);
-
-		if (produtoTipoIds.length === 0) {
-			formError = 'Selecione ao menos um produto.';
-			return;
-		}
-
-		const produtoAssoc = loteProdutoTipoIds.map((idValue) => {
-			const produtoTipoId = Number(idValue);
-			const quantidade = Number(loteQuantidades[idValue]);
-
-			if (!Number.isFinite(quantidade) || quantidade <= 0) {
-				throw new Error(`Informe uma quantidade válida para ${getProdutoNomeById(idValue)}.`);
-			}
-
-			if (isUnidadeInteira(getProdutoUnidadeById(idValue)) && !Number.isInteger(quantidade)) {
-				throw new Error(`Para ${getProdutoNomeById(idValue)}, informe um valor inteiro.`);
-			}
-
-			return {
-				produto_tipo_id: produtoTipoId,
-				quantidade
-			};
-		});
-
-		const success = await runProdutoMutation(
-			`http://127.0.0.1:5000/api/lotes/${editingLoteEpcTag}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					produto_assoc: produtoAssoc
-				})
-			},
-			'Não foi possível atualizar o lote.'
-		);
-
-		if (success) {
-			isLoteModalOpen = false;
-			editingLoteEpcTag = '';
-		}
+		return JSON.stringify(produtoAssoc);
 	}
 
-	async function moveLote(event: SubmitEvent) {
-		event.preventDefault();
+	const handleProdutoSubmit: SubmitFunction = () => {
+		isSubmitting = true;
 		resetProdutoForm();
 
-		if (!movingLoteEpcTag) return;
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível salvar o produto.';
+			}
+		};
+	};
 
-		const camaraId = Number(moveDestinoCamaraId);
-		if (!Number.isInteger(camaraId) || camaraId <= 0) {
-			formError = 'Selecione uma câmara de destino válida.';
+	const handleDeleteProdutoSubmit: SubmitFunction = () => {
+		isSubmitting = true;
+		resetProdutoForm();
+
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível excluir o produto.';
+			}
+		};
+	};
+
+	const handleLoteSubmit: SubmitFunction = () => {
+		isSubmitting = true;
+		resetProdutoForm();
+
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível atualizar o lote.';
+			}
+		};
+	};
+
+	const handleMoveLoteSubmit: SubmitFunction = () => {
+		isSubmitting = true;
+		resetProdutoForm();
+
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível movimentar o lote.';
+			}
+		};
+	};
+
+	$effect(() => {
+		if (!actionResult) return;
+
+		if (actionResult.action === 'createProduto' || actionResult.action === 'updateProduto') {
+			if (actionResult.success) {
+				isProdutoModalOpen = false;
+				editingProdutoId = null;
+				produtoClienteId = '';
+				produtoNome = '';
+				produtoSku = '';
+				produtoUnidadeMedida = 'un';
+				formError = '';
+				return;
+			}
+
+			if (actionResult.error) {
+				formError = actionResult.error;
+			}
+
+			const fieldValues = actionResult.fieldValues;
+			if (fieldValues) {
+				if (typeof fieldValues.clienteId === 'string') produtoClienteId = fieldValues.clienteId;
+				if (typeof fieldValues.nome === 'string') produtoNome = fieldValues.nome;
+				if (typeof fieldValues.sku === 'string') produtoSku = fieldValues.sku;
+				if (typeof fieldValues.unidadeMedida === 'string') {
+					produtoUnidadeMedida = fieldValues.unidadeMedida;
+				}
+			}
+
+			isProdutoModalOpen = true;
 			return;
 		}
 
-		const success = await runProdutoMutation(
-			`http://127.0.0.1:5000/api/lotes/${movingLoteEpcTag}/movimentar`,
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					camara_id: camaraId
-				})
-			},
-			'Não foi possível movimentar o lote.'
-		);
+		if (actionResult.action === 'updateLote') {
+			if (actionResult.success) {
+				isLoteModalOpen = false;
+				editingLoteEpcTag = '';
+				formError = '';
+				return;
+			}
 
-		if (success) {
-			isMoveLoteModalOpen = false;
-			isLoteModalOpen = false;
-			movingLoteEpcTag = '';
-			editingLoteEpcTag = '';
+			if (actionResult.error) {
+				formError = actionResult.error;
+			}
+
+			const fieldValues = actionResult.fieldValues;
+			if (fieldValues?.loteProdutoTipoIds) {
+				loteProdutoTipoIds = fieldValues.loteProdutoTipoIds;
+			}
+			if (fieldValues?.loteQuantidades) {
+				loteQuantidades = fieldValues.loteQuantidades;
+			}
+
+			isLoteModalOpen = true;
+			return;
 		}
-	}
+
+		if (actionResult.action === 'moveLote') {
+			if (actionResult.success) {
+				isMoveLoteModalOpen = false;
+				isLoteModalOpen = false;
+				movingLoteEpcTag = '';
+				editingLoteEpcTag = '';
+				moveDestinoCamaraId = '';
+				formError = '';
+				return;
+			}
+
+			if (actionResult.error) {
+				formError = actionResult.error;
+			}
+		}
+
+		if (actionResult.action === 'deleteProduto' && actionResult.error) {
+			formError = actionResult.error;
+		}
+	});
 </script>
 
 <div class="main-content p-8">
@@ -472,6 +419,13 @@
 		<Alert class="mt-8">
 			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
 			{data.error}
+		</Alert>
+	{/if}
+
+	{#if formError && !isProdutoModalOpen && !isLoteModalOpen && !isMoveLoteModalOpen}
+		<Alert class="mt-4">
+			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
+			{formError}
 		</Alert>
 	{/if}
 
@@ -551,6 +505,15 @@
 			<TableBody>
 				{#each filteredProdutos as produto}
 					<TableBodyRow>
+						<form
+							method="POST"
+							action="?/deleteProduto"
+							class="hidden"
+							bind:this={deleteProdutoForms[produto.id]}
+							use:enhance={handleDeleteProdutoSubmit}
+						>
+							<input type="hidden" name="produtoId" value={produto.id} />
+						</form>
 						<TableBodyCell>{produto.id}</TableBodyCell>
 						<TableBodyCell>{produto.cliente_id ?? '-'}</TableBodyCell>
 						<TableBodyCell>{produto.nome}</TableBodyCell>
@@ -642,10 +605,18 @@
 	{/if}
 
 	<Modal bind:open={isProdutoModalOpen} title={produtoModalTitle} size="md">
-		<form class="space-y-4" onsubmit={submitProdutoForm}>
+		<form
+			class="space-y-4"
+			method="POST"
+			action={editingProdutoId ? '?/updateProduto' : '?/createProduto'}
+			use:enhance={handleProdutoSubmit}
+		>
+			{#if editingProdutoId}
+				<input type="hidden" name="produtoId" value={editingProdutoId} />
+			{/if}
 			<div>
 				<Label for="produto-cliente-id">Cliente</Label>
-				<Select id="produto-cliente-id" bind:value={produtoClienteId}>
+				<Select id="produto-cliente-id" name="clienteId" bind:value={produtoClienteId}>
 					<option value="">Sem cliente</option>
 					{#each clientes as cliente}
 						<option value={cliente.id.toString()}>
@@ -656,15 +627,20 @@
 			</div>
 			<div>
 				<Label for="produto-nome">Nome</Label>
-				<Input id="produto-nome" bind:value={produtoNome} required />
+				<Input id="produto-nome" name="nome" bind:value={produtoNome} required />
 			</div>
 			<div>
 				<Label for="produto-sku">SKU</Label>
-				<Input id="produto-sku" bind:value={produtoSku} />
+				<Input id="produto-sku" name="sku" bind:value={produtoSku} />
 			</div>
 			<div>
 				<Label for="produto-unidade-medida">Unidade de medida</Label>
-				<Select id="produto-unidade-medida" bind:value={produtoUnidadeMedida} required>
+				<Select
+					id="produto-unidade-medida"
+					name="unidadeMedida"
+					bind:value={produtoUnidadeMedida}
+					required
+				>
 					{#each unidadeMedidaOptions as option}
 						<option value={option.value}>{option.label}</option>
 					{/each}
@@ -683,7 +659,9 @@
 	</Modal>
 
 	<Modal bind:open={isLoteModalOpen} title={loteModalTitle} size="md">
-		<form class="space-y-4" onsubmit={updateLote}>
+		<form class="space-y-4" method="POST" action="?/updateLote" use:enhance={handleLoteSubmit}>
+			<input type="hidden" name="epcTag" value={editingLoteEpcTag} />
+			<input type="hidden" name="produtoAssocJson" value={buildProdutoAssocJson()} />
 			<div>
 				<Label for="lote-epc-tag">EPC Tag</Label>
 				<Input id="lote-epc-tag" value={editingLoteEpcTag} disabled />
@@ -747,14 +725,15 @@
 	</Modal>
 
 	<Modal bind:open={isMoveLoteModalOpen} title={moveLoteModalTitle} size="md">
-		<form class="space-y-4" onsubmit={moveLote}>
+		<form class="space-y-4" method="POST" action="?/moveLote" use:enhance={handleMoveLoteSubmit}>
+			<input type="hidden" name="epcTag" value={movingLoteEpcTag} />
 			<div>
 				<Label for="move-lote-epc">EPC Tag</Label>
 				<Input id="move-lote-epc" value={movingLoteEpcTag} disabled />
 			</div>
 			<div>
 				<Label for="move-lote-camara">Destino (Câmara)</Label>
-				<Select id="move-lote-camara" bind:value={moveDestinoCamaraId} required>
+				<Select id="move-lote-camara" name="camaraId" bind:value={moveDestinoCamaraId} required>
 					<option value="">Selecione uma câmara</option>
 					{#each camaras as camara}
 						<option value={camara.id.toString()}>

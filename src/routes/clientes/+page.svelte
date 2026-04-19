@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import {
 		Alert,
 		Button,
@@ -13,12 +14,12 @@
 		TableHeadCell,
 		TableSearch
 	} from '$lib/uicomponents.js';
-	import { invalidateAll } from '$app/navigation';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 	import TableActions from '$lib/components/TableActions.svelte';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	type ClienteRow = {
 		id: number;
@@ -35,6 +36,19 @@
 	let formError = $state('');
 	let clienteNome = $state('');
 	let clienteCpfCnpj = $state('');
+	let deleteForms = $state<Record<number, HTMLFormElement | undefined>>({});
+
+	type ActionResultPayload = {
+		action?: 'create' | 'update' | 'delete';
+		success?: boolean;
+		error?: string;
+		fieldValues?: {
+			nome?: string;
+			cpfCnpj?: string;
+		};
+	};
+
+	let actionResult = $derived((form || null) as ActionResultPayload | null);
 
 	function onlyDigits(value: string) {
 		return (value || '').replace(/\D/g, '');
@@ -60,65 +74,6 @@
 	function handleCpfCnpjInput(event: Event) {
 		const target = event.currentTarget as HTMLInputElement | null;
 		clienteCpfCnpj = formatCpfCnpj(target?.value || clienteCpfCnpj);
-	}
-
-	function isRepeatedDigits(value: string) {
-		return /^(\d)\1+$/.test(value);
-	}
-
-	function validateCpf(digits: string) {
-		if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
-
-		const calcDigit = (base: string, factor: number) => {
-			let total = 0;
-			for (const char of base) {
-				total += Number(char) * factor;
-				factor -= 1;
-			}
-			const mod = total % 11;
-			return mod < 2 ? 0 : 11 - mod;
-		};
-
-		const first = calcDigit(digits.slice(0, 9), 10);
-		const second = calcDigit(digits.slice(0, 9) + String(first), 11);
-
-		return digits === `${digits.slice(0, 9)}${first}${second}`;
-	}
-
-	function validateCnpj(digits: string) {
-		if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
-
-		const calcDigit = (base: string, factors: number[]) => {
-			let total = 0;
-			for (let i = 0; i < base.length; i += 1) {
-				total += Number(base[i]) * factors[i];
-			}
-			const mod = total % 11;
-			return mod < 2 ? 0 : 11 - mod;
-		};
-
-		const first = calcDigit(digits.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
-		const second = calcDigit(
-			digits.slice(0, 12) + String(first),
-			[6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-		);
-
-		return digits === `${digits.slice(0, 12)}${first}${second}`;
-	}
-
-	function getValidatedCpfCnpjOrNull() {
-		const digits = onlyDigits(clienteCpfCnpj);
-		if (!digits) return null;
-		if (digits.length !== 11 && digits.length !== 14) {
-			throw new Error('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
-		}
-
-		const isValid = digits.length === 11 ? validateCpf(digits) : validateCnpj(digits);
-		if (!isValid) {
-			throw new Error('CPF/CNPJ inválido. Verifique os dígitos informados.');
-		}
-
-		return digits;
 	}
 
 	const normalize = (str: string) =>
@@ -169,107 +124,75 @@
 		isClienteModalOpen = true;
 	}
 
-	async function runClienteMutation(url: string, options: RequestInit, fallbackError: string) {
-		resetClienteForm();
-		isSubmitting = true;
-
-		try {
-			const response = await fetch(url, options);
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || fallbackError);
-			}
-
-			await invalidateAll();
-			return true;
-		} catch (error) {
-			formError = error instanceof Error ? error.message : fallbackError;
-			return false;
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function handleDeleteCliente(clienteId: number) {
+	function handleDeleteCliente(clienteId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
 
-		await runClienteMutation(
-			`http://127.0.0.1:5000/api/clientes/${clienteId}`,
-			{ method: 'DELETE' },
-			'Não foi possível excluir o cliente.'
-		);
+		deleteForms[clienteId]?.requestSubmit();
 	}
 
-	async function createCliente(event: SubmitEvent) {
-		event.preventDefault();
+	const handleClienteSubmit: SubmitFunction = () => {
+		isSubmitting = true;
 		resetClienteForm();
 
-		const nome = clienteNome.trim();
-		let cpfCnpj: string | null = null;
-		try {
-			cpfCnpj = getValidatedCpfCnpjOrNull();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'CPF/CNPJ inválido.';
-			return;
-		}
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
 
-		const success = await runClienteMutation(
-			'http://127.0.0.1:5000/api/clientes',
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					nome_razao_social: nome || null,
-					cpf_cnpj: cpfCnpj
-				})
-			},
-			'Não foi possível criar o cliente.'
-		);
+			if (result.type === 'error') {
+				formError = 'Não foi possível processar a solicitação.';
+			}
+		};
+	};
 
-		if (success) {
-			isClienteModalOpen = false;
-		}
-	}
+	const handleDeleteSubmit: SubmitFunction = () => {
+		isSubmitting = true;
+		resetClienteForm();
 
-	async function updateCliente(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingClienteId) return;
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
 
-		const nome = clienteNome.trim();
-		let cpfCnpj: string | null = null;
-		try {
-			cpfCnpj = getValidatedCpfCnpjOrNull();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'CPF/CNPJ inválido.';
-			return;
-		}
+			if (result.type === 'error') {
+				formError = 'Não foi possível excluir o cliente.';
+			}
+		};
+	};
 
-		const success = await runClienteMutation(
-			`http://127.0.0.1:5000/api/clientes/${editingClienteId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					nome_razao_social: nome || null,
-					cpf_cnpj: cpfCnpj
-				})
-			},
-			'Não foi possível atualizar o cliente.'
-		);
+	$effect(() => {
+		if (!actionResult) return;
 
-		if (success) {
+		if ((actionResult.action === 'create' || actionResult.action === 'update') && actionResult.success) {
 			isClienteModalOpen = false;
 			editingClienteId = null;
-		}
-	}
-
-	async function submitClienteForm(event: SubmitEvent) {
-		if (editingClienteId) {
-			await updateCliente(event);
+			clienteNome = '';
+			clienteCpfCnpj = '';
+			formError = '';
 			return;
 		}
-		await createCliente(event);
-	}
+
+		if (actionResult.action === 'create' || actionResult.action === 'update') {
+			if (actionResult.error) {
+				formError = actionResult.error;
+			}
+
+			const fieldValues = actionResult.fieldValues;
+			if (fieldValues) {
+				if (typeof fieldValues.nome === 'string') {
+					clienteNome = fieldValues.nome;
+				}
+				if (typeof fieldValues.cpfCnpj === 'string') {
+					clienteCpfCnpj = formatCpfCnpj(fieldValues.cpfCnpj);
+				}
+			}
+
+			isClienteModalOpen = true;
+			return;
+		}
+
+		if (actionResult.action === 'delete' && actionResult.error) {
+			formError = actionResult.error;
+		}
+	});
 </script>
 
 <div class="main-content p-8">
@@ -282,6 +205,13 @@
 		<Alert class="mt-8">
 			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
 			{data.error}
+		</Alert>
+	{/if}
+
+	{#if formError && !isClienteModalOpen}
+		<Alert class="mt-4">
+			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
+			{formError}
 		</Alert>
 	{/if}
 
@@ -325,6 +255,15 @@
 		<TableBody>
 			{#each filteredClientes as cliente}
 				<TableBodyRow>
+					<form
+						method="POST"
+						action="?/delete"
+						class="hidden"
+						bind:this={deleteForms[cliente.id]}
+						use:enhance={handleDeleteSubmit}
+					>
+						<input type="hidden" name="clienteId" value={cliente.id} />
+					</form>
 					<TableBodyCell>{cliente.id}</TableBodyCell>
 					<TableBodyCell>{cliente.nome_razao_social || cliente.nome || '-'}</TableBodyCell>
 					<TableBodyCell>{cliente.cpf_cnpj || '-'}</TableBodyCell>
@@ -348,15 +287,24 @@
 	</TableSearch>
 
 	<Modal bind:open={isClienteModalOpen} title={clienteModalTitle} size="md">
-		<form class="space-y-4" onsubmit={submitClienteForm}>
+		<form
+			class="space-y-4"
+			method="POST"
+			action={editingClienteId ? '?/update' : '?/create'}
+			use:enhance={handleClienteSubmit}
+		>
+			{#if editingClienteId}
+				<input type="hidden" name="clienteId" value={editingClienteId} />
+			{/if}
 			<div>
 				<Label for="cliente-nome">Nome / Razão social</Label>
-				<Input id="cliente-nome" bind:value={clienteNome} />
+				<Input id="cliente-nome" name="nome" bind:value={clienteNome} />
 			</div>
 			<div>
 				<Label for="cliente-cpf-cnpj">CPF/CNPJ</Label>
 				<Input
 					id="cliente-cpf-cnpj"
+					name="cpfCnpj"
 					bind:value={clienteCpfCnpj}
 					oninput={handleCpfCnpjInput}
 					placeholder="000.000.000-00 ou 00.000.000/0000-00"

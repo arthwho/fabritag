@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 	import { sensorStore } from '$lib/dispositivos.svelte.js';
 	import {
@@ -18,8 +19,34 @@
 	import InfraSensoresSection from './InfraSensoresSection.svelte';
 	import InfraCreateModals from './InfraCreateModals.svelte';
 
-	let { data } = $props();
+	type InfraActionResult = {
+		action?:
+			| 'createPredio'
+			| 'updatePredio'
+			| 'deletePredio'
+			| 'createCamara'
+			| 'updateCamara'
+			| 'deleteCamara'
+			| 'createSensor'
+			| 'updateSensor'
+			| 'deleteSensor';
+		success?: boolean;
+		error?: string;
+		fieldValues?: {
+			predioNome?: string;
+			predioEndereco?: string;
+			camaraPredioId?: string;
+			camaraNome?: string;
+			camaraCapacidade?: string;
+			sensorCamaraId?: string;
+			sensorModelo?: string;
+			sensorAtivo?: boolean;
+		};
+	};
+
+	let { data, form } = $props();
 	let infraestrutura = $derived(data.infraestrutura);
+	let actionResult = $derived((form || null) as InfraActionResult | null);
 	let deviceStatus = $derived(
 		sensorStore.liveStatuses['1'] || { status: 'Offline', ip_address: 'N/A' }
 	);
@@ -48,6 +75,9 @@
 	let sensorCamaraId = $state('');
 	let sensorModelo = $state('PN5180');
 	let sensorAtivo = $state(true);
+	let deletePredioForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deleteCamaraForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deleteSensorForms = $state<Record<number, HTMLFormElement | undefined>>({});
 
 	const normalize = (str: string) =>
 		str
@@ -101,32 +131,15 @@
 	let predioSubmitLabel = $derived(editingPredioId ? 'Salvar alterações' : 'Salvar');
 	let camaraSubmitLabel = $derived(editingCamaraId ? 'Salvar alterações' : 'Salvar');
 	let sensorSubmitLabel = $derived(editingSensorId ? 'Salvar alterações' : 'Salvar');
+	let predioFormAction = $derived(editingPredioId ? '?/updatePredio' : '?/createPredio');
+	let camaraFormAction = $derived(editingCamaraId ? '?/updateCamara' : '?/createCamara');
+	let sensorFormAction = $derived(editingSensorId ? '?/updateSensor' : '?/createSensor');
 
 	onMount(() => {
 		sensorStore.setInitial(data.liveStatuses || {});
 		const stopPolling = sensorStore.startPolling();
 		return () => stopPolling;
 	});
-
-	async function runInfraMutation(url: string, options: RequestInit, fallbackError: string) {
-		resetFeedback();
-		isSubmitting = true;
-
-		try {
-			const response = await fetch(url, options);
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || fallbackError);
-			}
-			await invalidateAll();
-			return true;
-		} catch (error) {
-			formError = error instanceof Error ? error.message : fallbackError;
-			return false;
-		} finally {
-			isSubmitting = false;
-		}
-	}
 
 	function handleEditPredio(predioId: number) {
 		const predio = infraestrutura?.lista_predios?.find((item) => item.id === predioId);
@@ -139,14 +152,9 @@
 		isPredioModalOpen = true;
 	}
 
-	async function handleDeletePredio(predioId: number) {
+	function handleDeletePredio(predioId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este prédio?')) return;
-
-		await runInfraMutation(
-			`http://127.0.0.1:5000/api/predios/${predioId}`,
-			{ method: 'DELETE' },
-			'Não foi possível excluir o prédio.'
-		);
+		deletePredioForms[predioId]?.requestSubmit();
 	}
 
 	function handleEditCamara(camaraId: number) {
@@ -161,14 +169,9 @@
 		isCamaraModalOpen = true;
 	}
 
-	async function handleDeleteCamara(camaraId: number) {
+	function handleDeleteCamara(camaraId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir esta câmara?')) return;
-
-		await runInfraMutation(
-			`http://127.0.0.1:5000/api/camaras/${camaraId}`,
-			{ method: 'DELETE' },
-			'Não foi possível excluir a câmara.'
-		);
+		deleteCamaraForms[camaraId]?.requestSubmit();
 	}
 
 	function handleEdit(sensorId: number) {
@@ -183,14 +186,9 @@
 		isSensorModalOpen = true;
 	}
 
-	async function handleDeleteSensor(sensorId: number) {
+	function handleDeleteSensor(sensorId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este sensor?')) return;
-
-		await runInfraMutation(
-			`http://127.0.0.1:5000/api/sensores/${sensorId}`,
-			{ method: 'DELETE' },
-			'Não foi possível excluir o sensor.'
-		);
+		deleteSensorForms[sensorId]?.requestSubmit();
 	}
 
 	function resetFeedback() {
@@ -223,207 +221,116 @@
 		isSensorModalOpen = true;
 	}
 
-	async function createPredio(event: SubmitEvent) {
-		event.preventDefault();
-		resetFeedback();
+	const handleInfraSubmit: SubmitFunction = () => {
 		isSubmitting = true;
+		resetFeedback();
 
-		try {
-			const response = await fetch('http://127.0.0.1:5000/api/predios', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					nome: predioNome,
-					endereco: predioEndereco || null
-				})
-			});
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível processar a solicitação.';
+			}
+		};
+	};
 
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || 'Não foi possível criar o prédio.');
+	const handleDeleteSubmit: SubmitFunction = () => {
+		isSubmitting = true;
+		resetFeedback();
+
+		return async ({ result, update }) => {
+			isSubmitting = false;
+			await update({ invalidateAll: result.type === 'success' });
+			if (result.type === 'error') {
+				formError = 'Não foi possível excluir o registro.';
+			}
+		};
+	};
+
+	$effect(() => {
+		if (!actionResult) return;
+
+		if (actionResult.action === 'createPredio' || actionResult.action === 'updatePredio') {
+			if (actionResult.success) {
+				isPredioModalOpen = false;
+				editingPredioId = null;
+				predioNome = '';
+				predioEndereco = '';
+				formError = '';
+				return;
 			}
 
-			isPredioModalOpen = false;
-			await invalidateAll();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Erro ao criar prédio.';
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function updatePredio(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingPredioId) return;
-		if (!predioNome.trim()) {
-			formError = 'O nome do prédio é obrigatório.';
+			if (actionResult.error) formError = actionResult.error;
+			if (actionResult.fieldValues) {
+				if (typeof actionResult.fieldValues.predioNome === 'string') {
+					predioNome = actionResult.fieldValues.predioNome;
+				}
+				if (typeof actionResult.fieldValues.predioEndereco === 'string') {
+					predioEndereco = actionResult.fieldValues.predioEndereco;
+				}
+			}
+			isPredioModalOpen = true;
 			return;
 		}
 
-		const success = await runInfraMutation(
-			`http://127.0.0.1:5000/api/predios/${editingPredioId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					nome: predioNome.trim(),
-					endereco: predioEndereco.trim() ? predioEndereco.trim() : null
-				})
-			},
-			'Não foi possível atualizar o prédio.'
-		);
-
-		if (success) {
-			isPredioModalOpen = false;
-			editingPredioId = null;
-		}
-	}
-
-	async function createCamara(event: SubmitEvent) {
-		event.preventDefault();
-		resetFeedback();
-		isSubmitting = true;
-
-		try {
-			const response = await fetch('http://127.0.0.1:5000/api/camaras', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					predio_id: Number(camaraPredioId),
-					nome: camaraNome,
-					capacidade_vagas: camaraCapacidade ? Number(camaraCapacidade) : null
-				})
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || 'Não foi possível criar a câmara.');
+		if (actionResult.action === 'createCamara' || actionResult.action === 'updateCamara') {
+			if (actionResult.success) {
+				isCamaraModalOpen = false;
+				editingCamaraId = null;
+				camaraPredioId = '';
+				camaraNome = '';
+				camaraCapacidade = '';
+				formError = '';
+				return;
 			}
 
-			isCamaraModalOpen = false;
-			await invalidateAll();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Erro ao criar câmara.';
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function updateCamara(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingCamaraId) return;
-		if (!camaraPredioId || !camaraNome.trim()) {
-			formError = 'Preencha os campos obrigatórios da câmara.';
+			if (actionResult.error) formError = actionResult.error;
+			if (actionResult.fieldValues) {
+				if (typeof actionResult.fieldValues.camaraPredioId === 'string') {
+					camaraPredioId = actionResult.fieldValues.camaraPredioId;
+				}
+				if (typeof actionResult.fieldValues.camaraNome === 'string') {
+					camaraNome = actionResult.fieldValues.camaraNome;
+				}
+				if (typeof actionResult.fieldValues.camaraCapacidade === 'string') {
+					camaraCapacidade = actionResult.fieldValues.camaraCapacidade;
+				}
+			}
+			isCamaraModalOpen = true;
 			return;
 		}
 
-		const capacidade = camaraCapacidade.trim() ? Number(camaraCapacidade) : null;
-		if (camaraCapacidade.trim() && (!Number.isInteger(capacidade) || Number(capacidade) < 0)) {
-			formError = 'Informe uma capacidade válida.';
-			return;
-		}
-
-		const success = await runInfraMutation(
-			`http://127.0.0.1:5000/api/camaras/${editingCamaraId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					predio_id: Number(camaraPredioId),
-					nome: camaraNome.trim(),
-					capacidade_vagas: capacidade
-				})
-			},
-			'Não foi possível atualizar a câmara.'
-		);
-
-		if (success) {
-			isCamaraModalOpen = false;
-			editingCamaraId = null;
-		}
-	}
-
-	async function createSensor(event: SubmitEvent) {
-		event.preventDefault();
-		resetFeedback();
-		isSubmitting = true;
-
-		try {
-			const response = await fetch('http://127.0.0.1:5000/api/sensores', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					camara_id: Number(sensorCamaraId),
-					modelo: sensorModelo || 'PN5180',
-					ativo: sensorAtivo
-				})
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(errorData.error || 'Não foi possível criar o sensor.');
+		if (actionResult.action === 'createSensor' || actionResult.action === 'updateSensor') {
+			if (actionResult.success) {
+				isSensorModalOpen = false;
+				editingSensorId = null;
+				sensorCamaraId = '';
+				sensorModelo = 'PN5180';
+				sensorAtivo = true;
+				formError = '';
+				return;
 			}
 
-			isSensorModalOpen = false;
-			await invalidateAll();
-		} catch (error) {
-			formError = error instanceof Error ? error.message : 'Erro ao criar sensor.';
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
-	async function updateSensor(event: SubmitEvent) {
-		event.preventDefault();
-		if (!editingSensorId) return;
-		if (!sensorCamaraId) {
-			formError = 'Selecione a câmara do sensor.';
+			if (actionResult.error) formError = actionResult.error;
+			if (actionResult.fieldValues) {
+				if (typeof actionResult.fieldValues.sensorCamaraId === 'string') {
+					sensorCamaraId = actionResult.fieldValues.sensorCamaraId;
+				}
+				if (typeof actionResult.fieldValues.sensorModelo === 'string') {
+					sensorModelo = actionResult.fieldValues.sensorModelo;
+				}
+				if (typeof actionResult.fieldValues.sensorAtivo === 'boolean') {
+					sensorAtivo = actionResult.fieldValues.sensorAtivo;
+				}
+			}
+			isSensorModalOpen = true;
 			return;
 		}
 
-		const success = await runInfraMutation(
-			`http://127.0.0.1:5000/api/sensores/${editingSensorId}`,
-			{
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					camara_id: Number(sensorCamaraId),
-					modelo: sensorModelo.trim() || 'PN5180',
-					ativo: sensorAtivo
-				})
-			},
-			'Não foi possível atualizar o sensor.'
-		);
-
-		if (success) {
-			isSensorModalOpen = false;
-			editingSensorId = null;
+		if (actionResult.error) {
+			formError = actionResult.error;
 		}
-	}
-
-	async function submitPredioForm(event: SubmitEvent) {
-		if (editingPredioId) {
-			await updatePredio(event);
-			return;
-		}
-		await createPredio(event);
-	}
-
-	async function submitCamaraForm(event: SubmitEvent) {
-		if (editingCamaraId) {
-			await updateCamara(event);
-			return;
-		}
-		await createCamara(event);
-	}
-
-	async function submitSensorForm(event: SubmitEvent) {
-		if (editingSensorId) {
-			await updateSensor(event);
-			return;
-		}
-		await createSensor(event);
-	}
+	});
 </script>
 
 <div class="main-content p-8">
@@ -437,7 +344,46 @@
 		</div>
 	{/if}
 
+	{#if formError && !isPredioModalOpen && !isCamaraModalOpen && !isSensorModalOpen}
+		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
+			{formError}
+		</div>
+	{/if}
+
 	{#if infraestrutura}
+		<div class="hidden">
+			{#each infraestrutura.lista_predios || [] as predio}
+				<form
+					method="POST"
+					action="?/deletePredio"
+					bind:this={deletePredioForms[predio.id]}
+					use:enhance={handleDeleteSubmit}
+				>
+					<input type="hidden" name="predioId" value={predio.id} />
+				</form>
+			{/each}
+			{#each infraestrutura.lista_camaras || [] as camara}
+				<form
+					method="POST"
+					action="?/deleteCamara"
+					bind:this={deleteCamaraForms[camara.id]}
+					use:enhance={handleDeleteSubmit}
+				>
+					<input type="hidden" name="camaraId" value={camara.id} />
+				</form>
+			{/each}
+			{#each infraestrutura.lista_sensores || [] as sensor}
+				<form
+					method="POST"
+					action="?/deleteSensor"
+					bind:this={deleteSensorForms[sensor.id]}
+					use:enhance={handleDeleteSubmit}
+				>
+					<input type="hidden" name="sensorId" value={sensor.id} />
+				</form>
+			{/each}
+		</div>
+
 		<div class="mt-8 mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
 			<InfoCard
 				title={deviceStatus.ip_address || 'N/A'}
@@ -533,9 +479,12 @@
 					{#each filteredAllTableRows as row}
 						<TableBodyRow>
 							<TableBodyCell>
-								<a href={`/infraestrutura/camaras/${row.id}`} class="flex items-center gap-2 font-medium hover:underline dark:text-white">
+								<a
+									href={`/infraestrutura/camaras/${row.id}`}
+									class="flex items-center gap-2 font-medium hover:underline dark:text-white"
+								>
 									{row.camara}
-									<ChevronRightOutline class="w-4 h-4 text-gray-400" />
+									<ChevronRightOutline class="h-4 w-4 text-gray-400" />
 								</a>
 							</TableBodyCell>
 							<TableBodyCell>{row.predio}</TableBodyCell>
@@ -596,11 +545,17 @@
 			bind:sensorCamaraId
 			bind:sensorModelo
 			bind:sensorAtivo
+			{editingPredioId}
+			{editingCamaraId}
+			{editingSensorId}
 			predios={infraestrutura.lista_predios}
 			camaras={infraestrutura.lista_camaras}
-			onSubmitPredio={submitPredioForm}
-			onSubmitCamara={submitCamaraForm}
-			onSubmitSensor={submitSensorForm}
+			{predioFormAction}
+			{camaraFormAction}
+			{sensorFormAction}
+			onEnhancePredio={handleInfraSubmit}
+			onEnhanceCamara={handleInfraSubmit}
+			onEnhanceSensor={handleInfraSubmit}
 		/>
 	{/if}
 </div>

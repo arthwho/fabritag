@@ -1,3 +1,51 @@
+function getColumnLetter(n) {
+	let letter = '';
+	while (n > 0) {
+		const temp = (n - 1) % 26;
+		letter = String.fromCharCode(temp + 65) + letter;
+		n = (n - temp - 1) / 26;
+	}
+	return letter;
+}
+
+function enrichCamara(camaraData) {
+	const capacity = Number(camaraData?.capacidade || 0);
+	const cols = Math.ceil(Math.sqrt(capacity * 1.5)) || 1;
+	const rows = Math.ceil(capacity / cols) || 0;
+
+	const lotesBase = Array.isArray(camaraData?.lotes) ? camaraData.lotes : [];
+	const lotes = lotesBase.map((lote) => {
+		const startPos = lote.posicao_vaga ?? 0;
+		const quantity = Math.max(1, Math.ceil(Number(lote.quantidade || 1)));
+		const endPos = startPos + quantity - 1;
+
+		const getPosStr = (idx) => {
+			const r = Math.floor(idx / cols) + 1;
+			const c = (idx % cols) + 1;
+			return `${getColumnLetter(c)}${r}`;
+		};
+
+		return {
+			...lote,
+			quantity,
+			startPos,
+			endPos,
+			posicao: quantity > 1 ? `${getPosStr(startPos)} - ${getPosStr(endPos)}` : getPosStr(startPos)
+		};
+	});
+
+	const ocupacaoCalculada = lotes.reduce((acc, lote) => acc + lote.quantity, 0);
+
+	return {
+		...camaraData,
+		capacity,
+		cols,
+		rows,
+		lotes,
+		ocupacao_calculada: ocupacaoCalculada
+	};
+}
+
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ params, fetch }) {
 	const { id } = params;
@@ -16,7 +64,7 @@ export async function load({ params, fetch }) {
 		const camaraData = await res.json();
 
 		return {
-			camara: camaraData,
+			camara: enrichCamara(camaraData),
 			error: null
 		};
 	} catch (error) {

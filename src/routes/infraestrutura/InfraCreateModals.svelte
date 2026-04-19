@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Modal, Input, Label, Select, Button } from '$lib/uicomponents.js';
 
 	type PredioOption = {
@@ -33,9 +35,15 @@
 		sensorAtivo = $bindable(true),
 		predios = [],
 		camaras = [],
-		onSubmitPredio,
-		onSubmitCamara,
-		onSubmitSensor
+		predioFormAction = '?/createPredio',
+		camaraFormAction = '?/createCamara',
+		sensorFormAction = '?/createSensor',
+		onEnhancePredio,
+		onEnhanceCamara,
+		onEnhanceSensor,
+		editingPredioId = null,
+		editingCamaraId = null,
+		editingSensorId = null
 	}: {
 		isPredioModalOpen?: boolean;
 		isCamaraModalOpen?: boolean;
@@ -58,21 +66,30 @@
 		sensorAtivo?: boolean;
 		predios?: PredioOption[];
 		camaras?: CamaraOption[];
-		onSubmitPredio: (event: SubmitEvent) => Promise<void>;
-		onSubmitCamara: (event: SubmitEvent) => Promise<void>;
-		onSubmitSensor: (event: SubmitEvent) => Promise<void>;
+		predioFormAction?: string;
+		camaraFormAction?: string;
+		sensorFormAction?: string;
+		onEnhancePredio: SubmitFunction;
+		onEnhanceCamara: SubmitFunction;
+		onEnhanceSensor: SubmitFunction;
+		editingPredioId?: number | null;
+		editingCamaraId?: number | null;
+		editingSensorId?: number | null;
 	} = $props();
 </script>
 
 <Modal bind:open={isPredioModalOpen} title={predioModalTitle} size="md">
-	<form class="space-y-4" onsubmit={onSubmitPredio}>
+	<form class="space-y-4" method="POST" action={predioFormAction} use:enhance={onEnhancePredio}>
+		{#if editingPredioId}
+			<input type="hidden" name="predioId" value={editingPredioId} />
+		{/if}
 		<div>
 			<Label for="predio-nome">Nome</Label>
-			<Input id="predio-nome" bind:value={predioNome} required />
+			<Input id="predio-nome" name="predioNome" bind:value={predioNome} required />
 		</div>
 		<div>
 			<Label for="predio-endereco">Endereço</Label>
-			<Input id="predio-endereco" bind:value={predioEndereco} />
+			<Input id="predio-endereco" name="predioEndereco" bind:value={predioEndereco} />
 		</div>
 		{#if formError}
 			<p class="text-sm text-red-600">{formError}</p>
@@ -87,10 +104,13 @@
 </Modal>
 
 <Modal bind:open={isCamaraModalOpen} title={camaraModalTitle} size="md">
-	<form class="space-y-4" onsubmit={onSubmitCamara}>
+	<form class="space-y-4" method="POST" action={camaraFormAction} use:enhance={onEnhanceCamara}>
+		{#if editingCamaraId}
+			<input type="hidden" name="camaraId" value={editingCamaraId} />
+		{/if}
 		<div>
 			<Label for="camara-predio">Prédio</Label>
-			<Select id="camara-predio" bind:value={camaraPredioId} required>
+			<Select id="camara-predio" name="camaraPredioId" bind:value={camaraPredioId} required>
 				{#each predios as predio}
 					<option value={predio.id.toString()}>{predio.nome}</option>
 				{/each}
@@ -98,11 +118,17 @@
 		</div>
 		<div>
 			<Label for="camara-nome">Nome</Label>
-			<Input id="camara-nome" bind:value={camaraNome} required />
+			<Input id="camara-nome" name="camaraNome" bind:value={camaraNome} required />
 		</div>
 		<div>
 			<Label for="camara-capacidade">Capacidade de Vagas</Label>
-			<Input id="camara-capacidade" type="number" min="0" bind:value={camaraCapacidade} />
+			<Input
+				id="camara-capacidade"
+				name="camaraCapacidade"
+				type="number"
+				min="0"
+				bind:value={camaraCapacidade}
+			/>
 		</div>
 		{#if formError}
 			<p class="text-sm text-red-600">{formError}</p>
@@ -117,10 +143,13 @@
 </Modal>
 
 <Modal bind:open={isSensorModalOpen} title={sensorModalTitle} size="md">
-	<form class="space-y-4" onsubmit={onSubmitSensor}>
+	<form class="space-y-4" method="POST" action={sensorFormAction} use:enhance={onEnhanceSensor}>
+		{#if editingSensorId}
+			<input type="hidden" name="sensorId" value={editingSensorId} />
+		{/if}
 		<div>
 			<Label for="sensor-camara">Câmara</Label>
-			<Select id="sensor-camara" bind:value={sensorCamaraId} required>
+			<Select id="sensor-camara" name="sensorCamaraId" bind:value={sensorCamaraId} required>
 				{#each camaras as camara}
 					<option value={camara.id.toString()}>{camara.nome}</option>
 				{/each}
@@ -128,8 +157,9 @@
 		</div>
 		<div>
 			<Label for="sensor-modelo">Modelo</Label>
-			<Input id="sensor-modelo" bind:value={sensorModelo} />
+			<Input id="sensor-modelo" name="sensorModelo" bind:value={sensorModelo} />
 		</div>
+		<input type="hidden" name="sensorAtivo" value={sensorAtivo ? 'true' : 'false'} />
 		{#if formError}
 			<p class="text-sm text-red-600">{formError}</p>
 		{/if}

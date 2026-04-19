@@ -1,3 +1,43 @@
+const normalizeText = (str) =>
+	String(str || '')
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '');
+
+const parseMovimentacaoDate = (value) => {
+	if (!value) return null;
+	const [datePart, timePart = '00:00:00'] = String(value).split(' ');
+	const [year, month, day] = datePart.split('-').map(Number);
+	const [hour, minute, second] = timePart.split(':').map(Number);
+
+	if (!year || !month || !day) return null;
+	return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0);
+};
+
+function enrichMovimentacoes(dashboardData) {
+	const baseMovimentacoes = Array.isArray(dashboardData?.ultimas_movimentacoes)
+		? dashboardData.ultimas_movimentacoes
+		: [];
+
+	const ultimasMovimentacoes = baseMovimentacoes.map((item) => {
+		const date = parseMovimentacaoDate(item?.data);
+		const searchIndex = normalizeText(
+			[item?.produto, item?.origem, item?.destino, item?.data].filter(Boolean).join(' ')
+		);
+
+		return {
+			...item,
+			date_timestamp: date ? date.getTime() : null,
+			search_index: searchIndex
+		};
+	});
+
+	return {
+		...dashboardData,
+		ultimas_movimentacoes: ultimasMovimentacoes
+	};
+}
+
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ fetch }) {
 	try {
@@ -5,7 +45,7 @@ export async function load({ fetch }) {
 		if (response.ok) {
 			const dashboardData = await response.json();
 			return {
-				dashboard: dashboardData,
+				dashboard: enrichMovimentacoes(dashboardData),
 				error: null
 			};
 		}

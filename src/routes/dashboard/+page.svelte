@@ -37,20 +37,13 @@
 			.normalize('NFD')
 			.replace(/[\u0300-\u036f]/g, '');
 
-	const parseMovimentacaoDate = (value: string) => {
-		if (!value) return null;
-		const [datePart, timePart = '00:00:00'] = value.split(' ');
-		const [year, month, day] = datePart.split('-').map(Number);
-		const [hour, minute, second] = timePart.split(':').map(Number);
-
-		if (!year || !month || !day) return null;
-		return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0);
-	};
-
 	const isSameDay = (dateA: Date, dateB: Date) =>
 		dateA.getFullYear() === dateB.getFullYear() &&
 		dateA.getMonth() === dateB.getMonth() &&
 		dateA.getDate() === dateB.getDate();
+
+	const dateFromTimestamp = (timestamp: number | null | undefined) =>
+		typeof timestamp === 'number' ? new Date(timestamp) : null;
 
 	const getYesterday = () => {
 		const now = new Date();
@@ -65,7 +58,7 @@
 
 	let movimentacoesNoPeriodo = $derived(
 		dashboard?.ultimas_movimentacoes?.filter((item) => {
-			const movDate = parseMovimentacaoDate(item?.data ?? '');
+			const movDate = dateFromTimestamp(item?.date_timestamp);
 			if (dashboardFilter === 'Todos') return true;
 			if (!movDate) return false;
 
@@ -145,7 +138,7 @@
 	let filteredMovimentacoes = $derived(
 		movimentacoesNoPeriodo.filter((item) => {
 			const search = normalize(searchTerm);
-			return Object.values(item).some((val) => normalize((val ?? '').toString()).includes(search));
+			return normalize(item?.search_index || '').includes(search);
 		}) || []
 	);
 </script>

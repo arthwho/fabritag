@@ -16,7 +16,7 @@
 	const error = $derived(data.error);
 	const warning = $derived(data.camara?.warning || null);
 
-	// Helper to convert number to Excel-style column (A, B, C... Z, AA, AB...)
+	// Local helper kept only for rendering column labels in the occupancy grid.
 	function getColumnLetter(n: number): string {
 		let letter = '';
 		while (n > 0) {
@@ -27,39 +27,10 @@
 		return letter;
 	}
 
-	// Grid calculations
-	const capacity = $derived(camara?.capacidade || 0);
-
-	// Determine grid dimensions (try to keep it somewhat square or wider)
-	const cols = $derived(Math.ceil(Math.sqrt(capacity * 1.5)) || 1);
-	const rows = $derived(Math.ceil(capacity / cols) || 0);
-
-	// Map lotes to positions based on their quantity (size) and stored posicao_vaga
-	const lotesWithPositions = $derived.by(() => {
-		if (!camara?.lotes) return [];
-
-		return camara.lotes.map((lote) => {
-			const startPos = lote.posicao_vaga ?? 0;
-			const quantity = Math.max(1, Math.ceil(lote.quantidade || 1));
-			const endPos = startPos + quantity - 1;
-
-			// Generate position string (e.g., "A1" or "A1-B1")
-			const getPosStr = (idx: number) => {
-				const r = Math.floor(idx / cols) + 1;
-				const c = (idx % cols) + 1;
-				return `${getColumnLetter(c)}${r}`;
-			};
-
-			return {
-				...lote,
-				quantity,
-				startPos,
-				endPos,
-				posicao:
-					quantity > 1 ? `${getPosStr(startPos)} - ${getPosStr(endPos)}` : getPosStr(startPos)
-			};
-		});
-	});
+	const capacity = $derived(camara?.capacity || 0);
+	const cols = $derived(camara?.cols || 1);
+	const rows = $derived(camara?.rows || 0);
+	const lotesWithPositions = $derived(camara?.lotes || []);
 
 	const occupiedPositions = $derived.by(() => {
 		const map = new Map();
@@ -76,9 +47,7 @@
 		return occupiedPositions.get(index);
 	}
 
-	const numOccupiedSpaces = $derived(
-		lotesWithPositions.reduce((acc, lote) => acc + lote.quantity, 0)
-	);
+	const numOccupiedSpaces = $derived(camara?.ocupacao_calculada || 0);
 </script>
 
 <div class="p-6">
@@ -113,11 +82,7 @@
 		{/if}
 
 		<div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
-			<InfoCard
-				title="Capacidade"
-				description="Total de vagas físicas"
-				value={camara.capacidade || 'N/A'}
-			/>
+			<InfoCard title="Capacidade" description="Total de vagas físicas" value={capacity || 'N/A'} />
 			<InfoCard
 				title="Ocupação"
 				description="Espaços físicos ocupados"
