@@ -12,7 +12,8 @@
 		TableBodyRow,
 		TableHead,
 		TableHeadCell,
-		TableSearch
+		TableSearch,
+		UserAddSolid
 	} from '$lib/uicomponents.js';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import InfoCard from '$lib/components/InfoCard.svelte';
@@ -161,7 +162,10 @@
 	$effect(() => {
 		if (!actionResult) return;
 
-		if ((actionResult.action === 'create' || actionResult.action === 'update') && actionResult.success) {
+		if (
+			(actionResult.action === 'create' || actionResult.action === 'update') &&
+			actionResult.success
+		) {
 			isClienteModalOpen = false;
 			editingClienteId = null;
 			clienteNome = '';
@@ -232,7 +236,9 @@
 
 	<div class="mb-4 flex items-center justify-between">
 		<h2 class="h1 text-gray-900 dark:text-white">Clientes Cadastrados</h2>
-		<Button color="orange" onclick={openClienteModal}>Adicionar Cliente</Button>
+		<Button color="orange" onclick={openClienteModal}
+			><UserAddSolid class="mr-2 w-4" />Adicionar Cliente</Button
+		>
 	</div>
 
 	<TableSearch

@@ -290,9 +290,9 @@ def delete_cliente(cliente_id):
         if cur.fetchone()[0] > 0:
             raise ValueError("Cannot delete cliente with existing dispositivos")
 
-        cur.execute("SELECT COUNT(*) FROM USUARIO WHERE cliente_id = %s", (cliente_id,))
-        if cur.fetchone()[0] > 0:
-            raise ValueError("Cannot delete cliente with existing usuarios")
+        # Usuários não impedem a exclusão do cliente: apenas desvinculamos o relacionamento.
+        cur.execute("UPDATE USUARIO SET cliente_id = NULL WHERE cliente_id = %s", (cliente_id,))
+        usuarios_desvinculados = cur.rowcount
 
         cur.execute("DELETE FROM CLIENTE WHERE id = %s RETURNING id", (cliente_id,))
         row = cur.fetchone()
@@ -300,7 +300,7 @@ def delete_cliente(cliente_id):
             raise ValueError("Cliente not found")
 
         conn.commit()
-        return {"id": row[0]}
+        return {"id": row[0], "usuarios_desvinculados": usuarios_desvinculados}
     except Exception:
         conn.rollback()
         raise

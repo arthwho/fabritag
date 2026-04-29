@@ -109,9 +109,16 @@ CREATE TABLE IF NOT EXISTS MOVIMENTACAO (
 -- Tabela 10 (novamente, listada como 10 na página 8 do PDF, mas é USUARIO)
 CREATE TABLE IF NOT EXISTS USUARIO (
     id SERIAL PRIMARY KEY,
+    nome_completo VARCHAR(150),
+    foto_perfil_url TEXT,
     email VARCHAR(100) UNIQUE,
-    cliente_id INT REFERENCES CLIENTE(id)
+    cliente_id INT REFERENCES CLIENTE(id),
+    senha_hash VARCHAR(255)
 );
+
+ALTER TABLE USUARIO ADD COLUMN IF NOT EXISTS nome_completo VARCHAR(150);
+ALTER TABLE USUARIO ADD COLUMN IF NOT EXISTS foto_perfil_url TEXT;
+ALTER TABLE USUARIO ADD COLUMN IF NOT EXISTS senha_hash VARCHAR(255);
 
 -- Dados iniciais para teste
 INSERT INTO PREDIO (nome, endereco) VALUES ('Prédio Central', 'Rua das Indústrias, 100') ON CONFLICT DO NOTHING;

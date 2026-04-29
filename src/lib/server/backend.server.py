@@ -1,9 +1,11 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import database_manager as db
+from auth import auth_bp, init_auth_schema
 
 app = Flask(__name__)
 CORS(app)
+app.register_blueprint(auth_bp)
 
 
 def value_error_status(message):
@@ -521,4 +523,5 @@ def get_all_dispositivo_statuses():
 
 if __name__ == '__main__':
     print("Starting Fabritag Backend (Modularized)...")
+    init_auth_schema()
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -37,5 +37,6 @@ export {
   TrashBinOutline,
   ChevronLeftOutline,
   ChevronRightOutline,
-  InfoCircleSolid
+  InfoCircleSolid,
+  UserAddSolid
 } from 'flowbite-svelte-icons';

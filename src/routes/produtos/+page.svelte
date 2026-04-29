@@ -13,7 +13,8 @@
 		TableHead,
 		TableHeadCell,
 		Alert,
-		InfoCircleSolid
+		InfoCircleSolid,
+		PlusOutline
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 	import TableActions from '$lib/components/TableActions.svelte';
@@ -479,7 +480,9 @@
 	{#if activeSection === 'produtos'}
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="h1 text-gray-900 dark:text-white">Produtos Cadastrados</h2>
-			<Button color="orange" onclick={openProdutoModal}>Adicionar Produto</Button>
+			<Button color="orange" onclick={openProdutoModal}
+				><PlusOutline class="mr-2 w-4" />Adicionar Produto</Button
+			>
 		</div>
 
 		<TableSearch

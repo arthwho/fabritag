@@ -23,9 +23,10 @@
 		LifeSaverOutline,
 		ArrowRightToBracketOutline,
 		AdjustmentsHorizontalOutline,
-		UserOutline
+		UserOutline,
+		UserSettingsOutline
 	} from 'flowbite-svelte-icons';
-	import { ArrowRightLeft } from 'lucide-svelte';
+	import { ArrowRightLeft, User } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import logo from '$lib/assets/logo-on-white.svg';
 
@@ -38,6 +39,16 @@
 		'flex items-center p-2 text-base font-normal text-orange-700 bg-neutral-200 dark:bg-orange-700 rounded-lg dark:text-white hover:bg-neutral-100 dark:hover:bg-gray-700';
 	const nonActiveClass =
 		'flex items-center p-2 text-base font-normal text-black-900 rounded-lg dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700';
+
+	let { user = null } = $props();
+
+	const displayName = $derived.by(() => {
+		if (user?.nome_completo) return user.nome_completo;
+		const email = user?.email || '';
+		if (!email) return 'Usuário';
+		const [namePart] = email.split('@');
+		return namePart || 'Usuário';
+	});
 </script>
 
 <Sidebar
@@ -89,14 +100,14 @@
 	>
 		<SidebarItem label="Clientes" href="/clientes" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
-				<ArrowRightLeft
+				<UsersGroupOutline
 					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
 				/>
 			{/snippet}
 		</SidebarItem>
 		<SidebarItem label="Usuários" href="/usuarios" {spanClass} {activeClass} {nonActiveClass}>
 			{#snippet icon()}
-				<UsersGroupOutline
+				<UserSettingsOutline
 					class="h-5 w-5 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white"
 				/>
 			{/snippet}
@@ -131,10 +142,19 @@
 	<div class="mt-auto mb-4 pt-6">
 		<Button class="w-full" color="light" size="sm" id="user-dropdown">
 			<div class="flex w-full items-center gap-2 text-left">
-				<Avatar />
+				{#if user?.foto_perfil_url}
+					<img
+						src={user.foto_perfil_url}
+						alt="Foto de perfil"
+						class="h-8 w-8 rounded-full object-cover"
+						referrerpolicy="no-referrer"
+					/>
+				{:else}
+					<Avatar />
+				{/if}
 				<div class="leading-tight">
-					<span class="block font-medium">Admin</span>
-					<span class="block text-xs text-gray-500">admin@fabritag.com</span>
+					<span class="block font-medium">{displayName}</span>
+					<span class="block text-xs text-gray-500">{user?.email || 'Sem sessão'}</span>
 				</div>
 			</div>
 		</Button>
@@ -144,7 +164,7 @@
 		<DropdownItem class="flex items-center gap-2" href="/settings">
 			<AdjustmentsHorizontalOutline />Configurações</DropdownItem
 		>
-		<DropdownItem class="flex items-center gap-2 text-red-600"
+		<DropdownItem class="flex items-center gap-2 text-red-600" href="/logout"
 			><ArrowRightToBracketOutline />Sair</DropdownItem
 		>
 	</Dropdown>
