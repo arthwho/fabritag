@@ -1,4 +1,18 @@
-# FABRITAG
+<div align="center">
+<img src="src\lib\assets\logo-on-white.svg" alt="Fabritag logo" style="width: 25%;">
+
+<strong>Fabritag</strong>
+
+[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](#)
+[![Postgres](https://img.shields.io/badge/Postgres-%23316192.svg?logo=postgresql&logoColor=white)](#)
+[![C++](https://img.shields.io/badge/C++-%2300599C.svg?logo=c%2B%2B&logoColor=white)](#)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-%23f1413d.svg?logo=svelte&logoColor=white)](#)
+[![Flask](https://img.shields.io/badge/Flask-000?logo=flask&logoColor=fff)](#)
+[![pnpm](https://img.shields.io/badge/pnpm-F69220?logo=pnpm&logoColor=fff)](#)
+
+</div>
+
+---
 
 Monorepo/workspace do projeto FABRITAG com:
 - Frontend em SvelteKit (`src/routes`, `src/components`, `src/lib/components`)
