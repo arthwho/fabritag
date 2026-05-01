@@ -1,3 +1,9 @@
+/**
+ * Converte índice de coluna em letras no padrão A, B, ..., AA.
+ *
+ * @param {number} n - Número da coluna começando em 1.
+ * @returns {string} Letra da coluna.
+ */
 function getColumnLetter(n) {
 	let letter = '';
 	while (n > 0) {
@@ -8,6 +14,12 @@ function getColumnLetter(n) {
 	return letter;
 }
 
+/**
+ * Enriquece detalhes da câmara com grade visual e posições dos lotes.
+ *
+ * @param {object|null} camaraData - Dados retornados pela API Flask.
+ * @returns {object} Câmara com capacidade, linhas, colunas e lotes posicionados.
+ */
 function enrichCamara(camaraData) {
 	const capacity = Number(camaraData?.capacidade || 0);
 	const cols = Math.ceil(Math.sqrt(capacity * 1.5)) || 1;
@@ -46,7 +58,15 @@ function enrichCamara(camaraData) {
 	};
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega os detalhes de uma câmara específica.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {{id: string}} input.params - Parâmetros da URL.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{camara: object|null, error: string|null}>} Dados da página.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ params, fetch }) {
 	const { id } = params;
 	try {

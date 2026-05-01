@@ -1,4 +1,11 @@
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega o status do dispositivo principal para a tela de configurações.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{sensorStatus: {status: string, ip_address: string}}>} Status do sensor.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
 	try {
 		const dispositivoId = 1;

@@ -1,8 +1,10 @@
 const BACKEND_URL = 'http://127.0.0.1:5000';
 
 /**
- * Fetches the live status of all dispositivos.
- * @param {typeof fetch} fetchFn - SvelteKit's fetch function.
+ * Busca o status ao vivo de todos os dispositivos conhecidos pelo backend.
+ *
+ * @param {typeof fetch} fetchFn - Função fetch do SvelteKit.
+ * @returns {Promise<Record<string, {status: string, ip_address: string}>>} Status por id.
  */
 export async function getAllDispositivoStatuses(fetchFn) {
 	try {
@@ -15,9 +17,11 @@ export async function getAllDispositivoStatuses(fetchFn) {
 }
 
 /**
- * Fetches the live status of a single dispositivo.
- * @param {typeof fetch} fetchFn 
- * @param {number|string} id 
+ * Busca o status ao vivo de um dispositivo específico.
+ *
+ * @param {typeof fetch} fetchFn - Função fetch do SvelteKit.
+ * @param {number|string} id - Identificador do dispositivo.
+ * @returns {Promise<{status: string, ip_address: string}>} Status encontrado ou fallback offline.
  */
 export async function getDispositivoStatus(fetchFn, id) {
 	try {

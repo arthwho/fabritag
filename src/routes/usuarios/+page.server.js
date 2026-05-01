@@ -4,6 +4,12 @@ import { getAuthToken } from '$lib/server/auth';
 const USUARIOS_API_URL = 'http://127.0.0.1:5000/api/usuarios';
 const CLIENTES_API_URL = 'http://127.0.0.1:5000/api/clientes';
 
+/**
+ * Monta headers de autenticação para chamadas protegidas.
+ *
+ * @param {string} token - Token salvo no cookie.
+ * @returns {Record<string, string>} Headers com Authorization ou objeto vazio.
+ */
 function authHeaders(token) {
     if (!token) return {};
     return {
@@ -11,10 +17,22 @@ function authHeaders(token) {
     };
 }
 
+/**
+ * Converte valores de formulário em texto aparado.
+ *
+ * @param {unknown} value - Valor bruto.
+ * @returns {string} Texto normalizado.
+ */
 function toStringValue(value) {
     return String(value ?? '').trim();
 }
 
+/**
+ * Lê um inteiro positivo opcional.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @returns {number|null} Inteiro positivo ou null quando vazio.
+ */
 function parseOptionalPositiveInteger(rawValue) {
     const value = toStringValue(rawValue);
     if (!value) return null;
@@ -27,14 +45,32 @@ function parseOptionalPositiveInteger(rawValue) {
     return numberValue;
 }
 
+/**
+ * Remove caracteres não numéricos de um valor.
+ *
+ * @param {unknown} value - CPF/CNPJ com ou sem pontuação.
+ * @returns {string} Apenas dígitos.
+ */
 function onlyDigits(value) {
     return String(value || '').replace(/\D/g, '');
 }
 
+/**
+ * Verifica se todos os dígitos são iguais.
+ *
+ * @param {string} value - Documento normalizado.
+ * @returns {boolean} True quando todos os dígitos repetem.
+ */
 function isRepeatedDigits(value) {
     return /^(\d)\1+$/.test(value);
 }
 
+/**
+ * Valida CPF sem pontuação.
+ *
+ * @param {string} digits - String com 11 dígitos.
+ * @returns {boolean} True quando válido.
+ */
 function validateCpf(digits) {
     if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
 
@@ -54,6 +90,12 @@ function validateCpf(digits) {
     return digits === `${digits.slice(0, 9)}${first}${second}`;
 }
 
+/**
+ * Valida CNPJ sem pontuação.
+ *
+ * @param {string} digits - String com 14 dígitos.
+ * @returns {boolean} True quando válido.
+ */
 function validateCnpj(digits) {
     if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
 
@@ -75,6 +117,12 @@ function validateCnpj(digits) {
     return digits === `${digits.slice(0, 12)}${first}${second}`;
 }
 
+/**
+ * Normaliza e valida CPF/CNPJ opcional.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @returns {string|null} Documento sem pontuação ou null quando vazio.
+ */
 function getValidatedCpfCnpjOrNull(rawValue) {
     const digits = onlyDigits(rawValue);
     if (!digits) return null;
@@ -90,6 +138,13 @@ function getValidatedCpfCnpjOrNull(rawValue) {
     return digits;
 }
 
+/**
+ * Extrai a mensagem de erro retornada pela API.
+ *
+ * @param {Response} response - Resposta fetch.
+ * @param {string} fallbackError - Mensagem padrão.
+ * @returns {Promise<string>} Mensagem final.
+ */
 async function getApiError(response, fallbackError) {
     const errorData = await response.json().catch(() => null);
     if (errorData?.error) return errorData.error;
@@ -98,7 +153,13 @@ async function getApiError(response, fallbackError) {
     return errorText || fallbackError;
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega usuários e clientes para a página administrativa.
+ *
+ * @param {import('@sveltejs/kit').RequestEvent} event - Evento com fetch e cookies.
+ * @returns {Promise<object>} Dados da página.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load(event) {
     const token = getAuthToken(event);
 

@@ -30,6 +30,7 @@
 		return () => stopPolling;
 	});
 
+	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
 		str
 			.toString()
@@ -37,19 +38,23 @@
 			.normalize('NFD')
 			.replace(/[\u0300-\u036f]/g, '');
 
+	/** Compara se duas datas estão no mesmo dia local. */
 	const isSameDay = (dateA: Date, dateB: Date) =>
 		dateA.getFullYear() === dateB.getFullYear() &&
 		dateA.getMonth() === dateB.getMonth() &&
 		dateA.getDate() === dateB.getDate();
 
+	/** Converte timestamp numérico em Date quando houver valor válido. */
 	const dateFromTimestamp = (timestamp: number | null | undefined) =>
 		typeof timestamp === 'number' ? new Date(timestamp) : null;
 
+	/** Retorna a data local de ontem sem preservar hora/minuto atuais. */
 	const getYesterday = () => {
 		const now = new Date();
 		return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 	};
 
+	/** Verifica se uma data está dentro dos últimos N dias. */
 	const isInLastDays = (date: Date, days: number) => {
 		const now = new Date();
 		const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));

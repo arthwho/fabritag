@@ -2,14 +2,32 @@ import { fail } from '@sveltejs/kit';
 
 const CLIENTES_API_URL = 'http://127.0.0.1:5000/api/clientes';
 
+/**
+ * Remove caracteres não numéricos de um valor.
+ *
+ * @param {unknown} value - Valor com ou sem pontuação.
+ * @returns {string} Apenas dígitos.
+ */
 function onlyDigits(value) {
     return String(value || '').replace(/\D/g, '');
 }
 
+/**
+ * Verifica se todos os dígitos são iguais.
+ *
+ * @param {string} value - Documento já normalizado.
+ * @returns {boolean} True quando todos os caracteres repetem.
+ */
 function isRepeatedDigits(value) {
     return /^(\d)\1+$/.test(value);
 }
 
+/**
+ * Valida um CPF sem pontuação.
+ *
+ * @param {string} digits - String com 11 dígitos.
+ * @returns {boolean} True quando os dígitos verificadores conferem.
+ */
 function validateCpf(digits) {
     if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
 
@@ -29,6 +47,12 @@ function validateCpf(digits) {
     return digits === `${digits.slice(0, 9)}${first}${second}`;
 }
 
+/**
+ * Valida um CNPJ sem pontuação.
+ *
+ * @param {string} digits - String com 14 dígitos.
+ * @returns {boolean} True quando os dígitos verificadores conferem.
+ */
 function validateCnpj(digits) {
     if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
 
@@ -50,6 +74,13 @@ function validateCnpj(digits) {
     return digits === `${digits.slice(0, 12)}${first}${second}`;
 }
 
+/**
+ * Normaliza e valida CPF/CNPJ informado no formulário.
+ *
+ * @param {FormDataEntryValue|string|null} rawValue - Valor bruto do campo.
+ * @returns {string|null} Documento sem pontuação ou null quando vazio.
+ * @throws {Error} Quando o tamanho ou dígitos verificadores são inválidos.
+ */
 function getValidatedCpfCnpjOrNull(rawValue) {
     const digits = onlyDigits(rawValue);
     if (!digits) return null;
@@ -65,6 +96,13 @@ function getValidatedCpfCnpjOrNull(rawValue) {
     return digits;
 }
 
+/**
+ * Extrai uma mensagem de erro de uma resposta HTTP da API.
+ *
+ * @param {Response} response - Resposta fetch com erro.
+ * @param {string} fallbackError - Mensagem usada quando a API não retorna texto.
+ * @returns {Promise<string>} Mensagem pronta para exibir no formulário.
+ */
 async function getApiError(response, fallbackError) {
     const errorData = await response.json().catch(() => null);
     if (errorData?.error) return errorData.error;
@@ -73,7 +111,14 @@ async function getApiError(response, fallbackError) {
     return errorText || fallbackError;
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega os clientes para a página.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{clientes: Array, error: string|null}>} Dados da tela.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
     try {
         const clientesRes = await fetch('http://127.0.0.1:5000/api/clientes');

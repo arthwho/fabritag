@@ -111,6 +111,7 @@
 	let loteSubmitLabel = $derived('Salvar alterações');
 	let moveLoteModalTitle = $derived('Movimentar lote');
 
+	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
 		str
 			.toString()
@@ -136,6 +137,7 @@
 		{ value: 'ha', label: 'Area: Hectare (ha)' }
 	];
 
+	/** Indica se a unidade exige quantidade inteira. */
 	function isUnidadeInteira(unidadeMedida: string | null | undefined) {
 		const normalized = normalize(unidadeMedida || '');
 		return normalized === 'un' || normalized === 'unidade';
@@ -168,10 +170,12 @@
 		})
 	);
 
+	/** Limpa mensagens de erro dos formulários de produtos e lotes. */
 	function resetProdutoForm() {
 		formError = '';
 	}
 
+	/** Abre o modal para criação de produto. */
 	function openProdutoModal() {
 		resetProdutoForm();
 		editingProdutoId = null;
@@ -182,6 +186,7 @@
 		isProdutoModalOpen = true;
 	}
 
+	/** Preenche o modal com dados do produto selecionado para edição. */
 	function handleEditProduto(produtoId: number) {
 		const produto = produtos.find((item) => item.id === produtoId);
 		if (!produto) return;
@@ -195,12 +200,14 @@
 		isProdutoModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão do produto selecionado. */
 	function handleDeleteProduto(produtoId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este produto?')) return;
 
 		deleteProdutoForms[produtoId]?.requestSubmit();
 	}
 
+	/** Abre o modal de lote com produtos e quantidades atuais do EPC informado. */
 	function handleEditLote(epcTag: string) {
 		const lote = lotes.find((item) => item.epc_tag === epcTag);
 		if (!lote) return;
@@ -231,6 +238,7 @@
 		isLoteModalOpen = true;
 	}
 
+	/** Abre o modal para mover o lote atualmente em edição para outra câmara. */
 	function openMoveLoteModal() {
 		if (!editingLoteEpcTag) return;
 		resetProdutoForm();
@@ -245,6 +253,7 @@
 		isMoveLoteModalOpen = true;
 	}
 
+	/** Mantém apenas quantidades dos produtos selecionados no lote. */
 	function syncLoteQuantidades() {
 		const next: Record<string, string> = {};
 		for (const id of loteProdutoTipoIds) {
@@ -253,24 +262,29 @@
 		loteQuantidades = next;
 	}
 
+	/** Retorna o nome de um produto pelo id usado no formulário de lote. */
 	function getProdutoNomeById(id: string) {
 		const produto = produtos.find((item) => String(item.id) === id);
 		return produto?.nome || `Produto ${id}`;
 	}
 
+	/** Retorna a unidade de medida de um produto pelo id. */
 	function getProdutoUnidadeById(id: string) {
 		const produto = produtos.find((item) => String(item.id) === id);
 		return produto?.unidade_medida || null;
 	}
 
+	/** Define o step do input de quantidade conforme a unidade do produto. */
 	function getStepForProduto(id: string) {
 		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
 	}
 
+	/** Define o mínimo do input de quantidade conforme a unidade do produto. */
 	function getMinForProduto(id: string) {
 		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
 	}
 
+	/** Serializa produtos selecionados e quantidades para envio ao action server-side. */
 	function buildProdutoAssocJson() {
 		const produtoAssoc = loteProdutoTipoIds.map((idValue) => ({
 			produto_tipo_id: Number(idValue),

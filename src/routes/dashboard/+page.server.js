@@ -1,9 +1,21 @@
+/**
+ * Normaliza texto para busca sem acentos e sem diferenciar maiúsculas.
+ *
+ * @param {unknown} str - Texto de origem.
+ * @returns {string} Texto normalizado.
+ */
 const normalizeText = (str) =>
 	String(str || '')
 		.toLowerCase()
 		.normalize('NFD')
 		.replace(/[\u0300-\u036f]/g, '');
 
+/**
+ * Converte timestamp textual do backend em Date local.
+ *
+ * @param {unknown} value - Data no formato "YYYY-MM-DD HH:mm:ss".
+ * @returns {Date|null} Data convertida ou null quando inválida.
+ */
 const parseMovimentacaoDate = (value) => {
 	if (!value) return null;
 	const [datePart, timePart = '00:00:00'] = String(value).split(' ');
@@ -14,6 +26,12 @@ const parseMovimentacaoDate = (value) => {
 	return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0);
 };
 
+/**
+ * Enriquece movimentações do dashboard com campos auxiliares de UI.
+ *
+ * @param {object|null} dashboardData - Payload retornado pela API Flask.
+ * @returns {object} Payload com date_timestamp e search_index nas movimentações.
+ */
 function enrichMovimentacoes(dashboardData) {
 	const baseMovimentacoes = Array.isArray(dashboardData?.ultimas_movimentacoes)
 		? dashboardData.ultimas_movimentacoes
@@ -38,7 +56,14 @@ function enrichMovimentacoes(dashboardData) {
 	};
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega os dados do dashboard.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{dashboard: object|null, error: string|null}>} Dados da página.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
 	try {
 		const response = await fetch('http://127.0.0.1:5000/api/dashboard');

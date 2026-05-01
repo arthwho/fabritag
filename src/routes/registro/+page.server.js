@@ -5,14 +5,32 @@ const GOOGLE_CONFIG_API_URL = 'http://127.0.0.1:5000/api/auth/google-config';
 const GOOGLE_AUTH_API_URL = 'http://127.0.0.1:5000/api/auth/google';
 const REGISTER_API_URL = 'http://127.0.0.1:5000/api/auth/register';
 
+/**
+ * Remove caracteres não numéricos de um valor.
+ *
+ * @param {unknown} value - Valor de CPF/CNPJ com ou sem pontuação.
+ * @returns {string} Apenas dígitos.
+ */
 function onlyDigits(value) {
     return String(value || '').replace(/\D/g, '');
 }
 
+/**
+ * Verifica se todos os dígitos de um documento são iguais.
+ *
+ * @param {string} value - Documento normalizado.
+ * @returns {boolean} True quando há repetição total.
+ */
 function isRepeatedDigits(value) {
     return /^(\d)\1+$/.test(value);
 }
 
+/**
+ * Valida CPF sem pontuação.
+ *
+ * @param {string} digits - String com 11 dígitos.
+ * @returns {boolean} True quando os dígitos verificadores são válidos.
+ */
 function validateCpf(digits) {
     if (digits.length !== 11 || isRepeatedDigits(digits)) return false;
 
@@ -32,6 +50,12 @@ function validateCpf(digits) {
     return digits === `${digits.slice(0, 9)}${first}${second}`;
 }
 
+/**
+ * Valida CNPJ sem pontuação.
+ *
+ * @param {string} digits - String com 14 dígitos.
+ * @returns {boolean} True quando os dígitos verificadores são válidos.
+ */
 function validateCnpj(digits) {
     if (digits.length !== 14 || isRepeatedDigits(digits)) return false;
 
@@ -53,6 +77,12 @@ function validateCnpj(digits) {
     return digits === `${digits.slice(0, 12)}${first}${second}`;
 }
 
+/**
+ * Normaliza e valida CPF/CNPJ opcional do registro.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @returns {string|null} Documento sem pontuação ou null quando vazio.
+ */
 function getValidatedCpfCnpjOrNull(rawValue) {
     const digits = onlyDigits(rawValue);
     if (!digits) return null;
@@ -68,7 +98,14 @@ function getValidatedCpfCnpjOrNull(rawValue) {
     return digits;
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega configuração de login Google para a página de registro.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{error: null, googleClientId: string}>} Configuração inicial.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
     let googleClientId = (process.env.PUBLIC_GOOGLE_CLIENT_ID || '').trim();
 

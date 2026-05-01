@@ -3,8 +3,21 @@ import { fail } from '@sveltejs/kit';
 const PRODUTOS_API_URL = 'http://127.0.0.1:5000/api/produtos';
 const LOTES_API_URL = 'http://127.0.0.1:5000/api/lotes';
 
+/**
+ * Converte valores de formulário em string aparada.
+ *
+ * @param {unknown} value - Valor recebido de FormData ou API.
+ * @returns {string} Texto sem espaços nas extremidades.
+ */
 const toStringValue = (value) => String(value ?? '').trim();
 
+/**
+ * Lê um inteiro positivo opcional.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @returns {number|null} Inteiro positivo ou null quando vazio.
+ * @throws {Error} Quando o valor não é inteiro positivo.
+ */
 function parseOptionalPositiveInteger(rawValue) {
     const value = toStringValue(rawValue);
     if (!value) return null;
@@ -17,6 +30,13 @@ function parseOptionalPositiveInteger(rawValue) {
     return numberValue;
 }
 
+/**
+ * Lê um inteiro positivo obrigatório.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @param {string} errorMessage - Mensagem usada em caso de validação.
+ * @returns {number} Inteiro positivo validado.
+ */
 function parseRequiredPositiveInteger(rawValue, errorMessage) {
     const numberValue = Number(rawValue);
     if (!Number.isInteger(numberValue) || numberValue < 1) {
@@ -26,6 +46,13 @@ function parseRequiredPositiveInteger(rawValue, errorMessage) {
     return numberValue;
 }
 
+/**
+ * Converte o JSON de associação de produtos do lote.
+ *
+ * @param {unknown} rawValue - JSON serializado pelo formulário.
+ * @returns {Array<{produto_tipo_id: number, quantidade: number}>} Associações normalizadas.
+ * @throws {Error} Quando o JSON, produto ou quantidade são inválidos.
+ */
 function parseProdutoAssoc(rawValue) {
     let parsed = [];
     try {
@@ -57,6 +84,13 @@ function parseProdutoAssoc(rawValue) {
     });
 }
 
+/**
+ * Extrai mensagem de erro de uma resposta HTTP.
+ *
+ * @param {Response} response - Resposta da API.
+ * @param {string} fallbackError - Mensagem padrão.
+ * @returns {Promise<string>} Mensagem final de erro.
+ */
 async function getApiError(response, fallbackError) {
     const errorData = await response.json().catch(() => null);
     if (errorData?.error) return errorData.error;
@@ -65,7 +99,14 @@ async function getApiError(response, fallbackError) {
     return errorText || fallbackError;
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega produtos, lotes, clientes e câmaras para a página de produtos.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<object>} Dados agregados para renderização.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
     try {
         const [produtosRes, batchesRes, clientesRes, camarasRes] = await Promise.all([

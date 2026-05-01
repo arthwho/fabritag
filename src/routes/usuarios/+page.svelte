@@ -69,6 +69,7 @@
 	let usuarioCpfCnpj = $state('');
 	let deleteForms = $state<Record<number, HTMLFormElement | undefined>>({});
 
+	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
 		str
 			.toString()
@@ -101,10 +102,12 @@
 	let usuarioModalTitle = $derived(editingUsuarioId ? 'Editar Usuário' : 'Adicionar Usuário');
 	let usuarioSubmitLabel = $derived(editingUsuarioId ? 'Salvar alterações' : 'Salvar');
 
+	/** Limpa mensagens de erro do formulário de usuário. */
 	function resetUsuarioForm() {
 		formError = '';
 	}
 
+	/** Abre o modal para criação de usuário. */
 	function openUsuarioModal() {
 		resetUsuarioForm();
 		editingUsuarioId = null;
@@ -117,6 +120,7 @@
 		isUsuarioModalOpen = true;
 	}
 
+	/** Preenche o modal com dados do usuário selecionado para edição. */
 	function handleEditUsuario(usuarioId: number) {
 		const usuario = usuarios.find((item) => item.id === usuarioId);
 		if (!usuario) return;
@@ -132,6 +136,7 @@
 		isUsuarioModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão do usuário selecionado. */
 	function handleDeleteUsuario(usuarioId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este usuário?')) return;
 		deleteForms[usuarioId]?.requestSubmit();

@@ -26,12 +26,29 @@ except Exception as e:
     db_pool = None
 
 def get_db_connection():
+    """Retorna uma conexão disponível do pool PostgreSQL.
+
+    Use esta função antes de executar consultas no banco. A conexão retornada
+    deve ser liberada com release_db_connection(conn) no bloco finally.
+    """
     return db_pool.getconn()
 
 def release_db_connection(conn):
+    """Devolve uma conexão usada ao pool PostgreSQL.
+
+    Parâmetros:
+        conn: conexão obtida com get_db_connection().
+    """
     db_pool.putconn(conn)
 
 def _batch_size_from_qty(qty):
+    """Converte uma quantidade de lote em número inteiro de vagas ocupadas.
+
+    Parâmetros:
+        qty: quantidade numérica recebida do banco ou da API.
+
+    Retorna pelo menos 1 vaga, arredondando quantidades fracionadas para cima.
+    """
     try:
         value = float(qty or 1)
     except (TypeError, ValueError):
@@ -39,6 +56,14 @@ def _batch_size_from_qty(qty):
     return max(1, int(math.ceil(value)))
 
 def _camera_capacity(cur, camara_id):
+    """Busca a capacidade de vagas de uma câmara.
+
+    Parâmetros:
+        cur: cursor PostgreSQL já aberto.
+        camara_id: identificador da câmara.
+
+    Retorna 0 quando a câmara não existe e 100 quando a capacidade está vazia.
+    """
     cur.execute("SELECT capacidade_vagas FROM CAMARA WHERE id = %s", (camara_id,))
     res = cur.fetchone()
     if not res:
@@ -46,6 +71,15 @@ def _camera_capacity(cur, camara_id):
     return res[0] or 100
 
 def _repack_open_movimentacoes(cur, camara_id, strict=True):
+    """Reorganiza posições abertas de uma câmara em blocos contíguos.
+
+    Parâmetros:
+        cur: cursor PostgreSQL dentro de uma transação ativa.
+        camara_id: câmara que terá suas movimentações abertas recalculadas.
+        strict: quando True, lança ValueError se a ocupação exceder a capacidade.
+
+    Atualiza posicao_vaga das movimentações abertas e retorna dados de ocupação.
+    """
     capacity = _camera_capacity(cur, camara_id)
 
     cur.execute(
@@ -82,6 +116,13 @@ def _repack_open_movimentacoes(cur, camara_id, strict=True):
     }
 
 def _ensure_lote_produto_assoc_table(cur):
+    """Garante a existência e o formato mínimo da tabela LOTE_PRODUTO_ASSOC.
+
+    Parâmetros:
+        cur: cursor PostgreSQL usado para executar DDL/DML na transação atual.
+
+    Deve ser chamada antes de ler ou alterar associações de produtos por lote.
+    """
     cur.execute(
         "CREATE TABLE IF NOT EXISTS LOTE_PRODUTO_ASSOC ("
         "epc_tag VARCHAR(50) REFERENCES LOTE_TAGGEADO(epc_tag) ON DELETE CASCADE, "
@@ -96,6 +137,11 @@ def _ensure_lote_produto_assoc_table(cur):
     cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET NOT NULL")
 
 def fetch_batch():
+    """Lista os lotes taggeados com produtos, quantidades e localização atual.
+
+    Não recebe parâmetros. Usa uma conexão do pool, consulta lotes e
+    movimentações, e retorna uma lista de dicionários pronta para a API.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -174,6 +220,10 @@ def fetch_batch():
         release_db_connection(conn)
 
 def fetch_produtos():
+    """Busca tipos de produtos em formato simples para seletores.
+
+    Retorna uma lista com id e nome, incluindo o SKU no texto quando existir.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -192,6 +242,10 @@ def fetch_produtos():
         release_db_connection(conn)
 
 def fetch_camaras():
+    """Busca câmaras cadastradas para uso em listas e formulários.
+
+    Retorna uma lista de dicionários com id e nome de cada câmara.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -202,6 +256,10 @@ def fetch_camaras():
         release_db_connection(conn)
 
 def fetch_clientes():
+    """Lista clientes cadastrados com nome e CPF/CNPJ.
+
+    Retorna os registros ordenados por id, usando um nome padrão quando vazio.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -222,6 +280,14 @@ def fetch_clientes():
         release_db_connection(conn)
 
 def create_cliente(cpf_cnpj=None, nome_razao_social=None):
+    """Cria um cliente.
+
+    Parâmetros:
+        cpf_cnpj: documento já validado ou opcional.
+        nome_razao_social: nome exibido para o cliente.
+
+    Retorna o cliente criado com id, documento e nome normalizado.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -249,6 +315,15 @@ def create_cliente(cpf_cnpj=None, nome_razao_social=None):
         release_db_connection(conn)
 
 def update_cliente(cliente_id, cpf_cnpj=None, nome_razao_social=None):
+    """Atualiza os dados cadastrais de um cliente existente.
+
+    Parâmetros:
+        cliente_id: id do cliente a alterar.
+        cpf_cnpj: novo documento ou None.
+        nome_razao_social: novo nome/razão social ou None.
+
+    Lança ValueError quando o cliente não existe.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -279,6 +354,13 @@ def update_cliente(cliente_id, cpf_cnpj=None, nome_razao_social=None):
         release_db_connection(conn)
 
 def delete_cliente(cliente_id):
+    """Remove um cliente quando não há vínculos impeditivos.
+
+    Parâmetros:
+        cliente_id: id do cliente a excluir.
+
+    Desvincula usuários ligados ao cliente e retorna o id removido.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -309,6 +391,14 @@ def delete_cliente(cliente_id):
         release_db_connection(conn)
 
 def create_predio(nome, endereco=None):
+    """Cria um prédio para agrupar câmaras.
+
+    Parâmetros:
+        nome: nome obrigatório do prédio.
+        endereco: endereço opcional.
+
+    Retorna o prédio criado.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -331,6 +421,15 @@ def create_predio(nome, endereco=None):
         release_db_connection(conn)
 
 def create_camara(predio_id, nome, capacidade_vagas=None):
+    """Cria uma câmara vinculada a um prédio existente.
+
+    Parâmetros:
+        predio_id: id do prédio pai.
+        nome: nome da câmara.
+        capacidade_vagas: limite opcional de vagas.
+
+    Valida a existência do prédio antes da inserção.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -359,6 +458,15 @@ def create_camara(predio_id, nome, capacidade_vagas=None):
         release_db_connection(conn)
 
 def create_sensor(camara_id, modelo='PN5180', ativo=True):
+    """Cria um sensor em uma câmara.
+
+    Parâmetros:
+        camara_id: id da câmara onde o sensor será instalado.
+        modelo: modelo do sensor, com padrão PN5180.
+        ativo: indica se o sensor começa ativo.
+
+    Associa automaticamente o primeiro dispositivo ativo, se houver.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -393,6 +501,13 @@ def create_sensor(camara_id, modelo='PN5180', ativo=True):
         release_db_connection(conn)
 
 def update_predio(predio_id, nome, endereco=None):
+    """Atualiza nome e endereço de um prédio.
+
+    Parâmetros:
+        predio_id: id do prédio.
+        nome: novo nome obrigatório.
+        endereco: novo endereço opcional.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -418,6 +533,13 @@ def update_predio(predio_id, nome, endereco=None):
         release_db_connection(conn)
 
 def delete_predio(predio_id):
+    """Exclui um prédio sem câmaras associadas.
+
+    Parâmetros:
+        predio_id: id do prédio.
+
+    Lança ValueError se houver câmaras dependentes ou se o prédio não existir.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -440,6 +562,14 @@ def delete_predio(predio_id):
         release_db_connection(conn)
 
 def update_camara(camara_id, predio_id, nome, capacidade_vagas=None):
+    """Atualiza uma câmara e seu prédio de vínculo.
+
+    Parâmetros:
+        camara_id: id da câmara.
+        predio_id: id do prédio válido.
+        nome: novo nome da câmara.
+        capacidade_vagas: nova capacidade opcional.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -473,6 +603,11 @@ def update_camara(camara_id, predio_id, nome, capacidade_vagas=None):
         release_db_connection(conn)
 
 def delete_camara(camara_id):
+    """Exclui uma câmara quando não há sensores ou movimentações vinculadas.
+
+    Parâmetros:
+        camara_id: id da câmara.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -499,6 +634,14 @@ def delete_camara(camara_id):
         release_db_connection(conn)
 
 def update_sensor(sensor_id, camara_id, modelo='PN5180', ativo=True):
+    """Atualiza dados operacionais de um sensor.
+
+    Parâmetros:
+        sensor_id: id do sensor.
+        camara_id: nova câmara vinculada.
+        modelo: modelo do sensor.
+        ativo: status ativo/inativo.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -533,6 +676,11 @@ def update_sensor(sensor_id, camara_id, modelo='PN5180', ativo=True):
         release_db_connection(conn)
 
 def delete_sensor(sensor_id):
+    """Remove um sensor sem leituras brutas associadas.
+
+    Parâmetros:
+        sensor_id: id do sensor.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -555,6 +703,17 @@ def delete_sensor(sensor_id):
         release_db_connection(conn)
 
 def process_tag_event(epc_tag, sensor_id, event, rssi):
+    """Processa uma leitura RFID enviada por um sensor.
+
+    Parâmetros:
+        epc_tag: identificador EPC do lote.
+        sensor_id: sensor que fez a leitura.
+        event: tipo do evento, como ARRIVED ou REMOVED.
+        rssi: intensidade do sinal registrada.
+
+    Registra a leitura bruta, cria o lote se necessário e abre/fecha
+    movimentações conforme o evento.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -613,6 +772,11 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
         release_db_connection(conn)
 
 def fetch_dashboard_data():
+    """Monta os indicadores usados pelo dashboard.
+
+    Retorna totais de câmaras, sensores, lotes, movimentações do dia e as
+    últimas movimentações formatadas para a interface.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -659,6 +823,11 @@ def fetch_dashboard_data():
         release_db_connection(conn)
 
 def fetch_infraestrutura_data():
+    """Monta dados consolidados da página de infraestrutura.
+
+    Retorna contadores e listas de sensores, prédios e câmaras já agregadas
+    com nomes e status para exibição.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -746,6 +915,11 @@ def fetch_infraestrutura_data():
         release_db_connection(conn)
 
 def fetch_pagina_produtos_data():
+    """Monta dados da página de produtos e lotes sem produto.
+
+    Retorna produtos com cliente, SKU, unidade e contagem de lotes, além de
+    EPCs ainda não associados a produtos válidos.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -788,6 +962,14 @@ def fetch_pagina_produtos_data():
         release_db_connection(conn)
 
 def create_produto_tipo(cliente_id=None, nome=None, sku=None, unidade_medida=None):
+    """Cria um tipo de produto.
+
+    Parâmetros:
+        cliente_id: cliente dono do produto ou None.
+        nome: nome do produto.
+        sku: código SKU opcional.
+        unidade_medida: unidade de controle, como un ou kg.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -818,6 +1000,15 @@ def create_produto_tipo(cliente_id=None, nome=None, sku=None, unidade_medida=Non
         release_db_connection(conn)
 
 def update_produto_tipo(produto_id, cliente_id=None, nome=None, sku=None, unidade_medida=None):
+    """Atualiza um tipo de produto existente.
+
+    Parâmetros:
+        produto_id: id do produto.
+        cliente_id: novo cliente associado ou None.
+        nome: novo nome.
+        sku: novo SKU opcional.
+        unidade_medida: nova unidade de medida opcional.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -852,6 +1043,11 @@ def update_produto_tipo(produto_id, cliente_id=None, nome=None, sku=None, unidad
         release_db_connection(conn)
 
 def delete_produto_tipo(produto_id):
+    """Exclui um tipo de produto sem lotes vinculados.
+
+    Parâmetros:
+        produto_id: id do tipo de produto.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -874,6 +1070,15 @@ def delete_produto_tipo(produto_id):
         release_db_connection(conn)
 
 def update_lote_taggeado(epc_tag, produto_assoc=None):
+    """Atualiza os produtos e quantidades associados a um lote taggeado.
+
+    Parâmetros:
+        epc_tag: identificador EPC do lote.
+        produto_assoc: lista de itens com produto_tipo_id e quantidade.
+
+    Normaliza duplicidades, valida quantidades e reorganiza ocupação da câmara
+    se o lote estiver em uma movimentação aberta.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -976,6 +1181,15 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
         release_db_connection(conn)
 
 def move_lote_to_camara(epc_tag, camara_id):
+    """Move um lote para outra câmara.
+
+    Parâmetros:
+        epc_tag: identificador EPC do lote.
+        camara_id: câmara de destino.
+
+    Fecha a movimentação aberta anterior, encontra vaga disponível na câmara
+    destino e cria uma nova movimentação.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -1038,6 +1252,14 @@ def move_lote_to_camara(epc_tag, camara_id):
         release_db_connection(conn)
 
 def fetch_camara_detalhes(camara_id):
+    """Busca detalhes de ocupação de uma câmara.
+
+    Parâmetros:
+        camara_id: id da câmara.
+
+    Retorna metadados da câmara, lotes atualmente dentro dela, ocupação total
+    e aviso de capacidade quando aplicável.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -1093,6 +1315,15 @@ def fetch_camara_detalhes(camara_id):
         release_db_connection(conn)
 
 def _find_available_slot(cur, camara_id, batch_size):
+    """Localiza o primeiro intervalo contíguo de vagas livres.
+
+    Parâmetros:
+        cur: cursor PostgreSQL da transação atual.
+        camara_id: câmara onde a vaga será procurada.
+        batch_size: quantidade de vagas contíguas necessárias.
+
+    Retorna o índice inicial da vaga ou None quando não há espaço.
+    """
     # 1. Get capacity
     capacity = _camera_capacity(cur, camara_id)
 

@@ -2,8 +2,21 @@ import { fail } from '@sveltejs/kit';
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
+/**
+ * Converte valores de formulário em string aparada.
+ *
+ * @param {unknown} value - Valor recebido de FormData ou API.
+ * @returns {string} Texto normalizado.
+ */
 const toStringValue = (value) => String(value ?? '').trim();
 
+/**
+ * Lê um inteiro positivo obrigatório.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @param {string} errorMessage - Mensagem para valor inválido.
+ * @returns {number} Inteiro positivo.
+ */
 function parseRequiredPositiveInteger(rawValue, errorMessage) {
 	const numberValue = Number(rawValue);
 	if (!Number.isInteger(numberValue) || numberValue <= 0) {
@@ -13,6 +26,13 @@ function parseRequiredPositiveInteger(rawValue, errorMessage) {
 	return numberValue;
 }
 
+/**
+ * Lê um inteiro não negativo opcional.
+ *
+ * @param {unknown} rawValue - Valor bruto do formulário.
+ * @param {string} errorMessage - Mensagem para valor inválido.
+ * @returns {number|null} Inteiro não negativo ou null quando vazio.
+ */
 function parseOptionalNonNegativeInteger(rawValue, errorMessage) {
 	const value = toStringValue(rawValue);
 	if (!value) return null;
@@ -25,11 +45,24 @@ function parseOptionalNonNegativeInteger(rawValue, errorMessage) {
 	return numberValue;
 }
 
+/**
+ * Interpreta valor de formulário como booleano.
+ *
+ * @param {unknown} rawValue - Valor bruto do checkbox/campo.
+ * @returns {boolean} True para true, 1 ou on.
+ */
 function parseBooleanFromFormData(rawValue) {
 	const value = toStringValue(rawValue).toLowerCase();
 	return value === 'true' || value === '1' || value === 'on';
 }
 
+/**
+ * Extrai mensagem de erro de uma resposta HTTP da API.
+ *
+ * @param {Response} response - Resposta fetch com erro.
+ * @param {string} fallbackError - Mensagem padrão.
+ * @returns {Promise<string>} Mensagem final.
+ */
 async function getApiError(response, fallbackError) {
 	const errorData = await response.json().catch(() => null);
 	if (errorData?.error) return errorData.error;
@@ -38,7 +71,14 @@ async function getApiError(response, fallbackError) {
 	return errorText || fallbackError;
 }
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega infraestrutura e status ao vivo dos dispositivos.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<object>} Dados da infraestrutura, status e erro opcional.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
 	try {
 		const [infraRes, liveRes] = await Promise.all([

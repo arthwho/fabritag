@@ -51,10 +51,12 @@
 
 	let actionResult = $derived((form || null) as ActionResultPayload | null);
 
+	/** Remove pontuação do CPF/CNPJ digitado pelo usuário. */
 	function onlyDigits(value: string) {
 		return (value || '').replace(/\D/g, '');
 	}
 
+	/** Formata CPF ou CNPJ conforme a quantidade de dígitos informada. */
 	function formatCpfCnpj(value: string) {
 		const digits = onlyDigits(value).slice(0, 14);
 
@@ -72,11 +74,13 @@
 			.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
 	}
 
+	/** Sincroniza o valor mascarado do campo CPF/CNPJ com o estado do formulário. */
 	function handleCpfCnpjInput(event: Event) {
 		const target = event.currentTarget as HTMLInputElement | null;
 		clienteCpfCnpj = formatCpfCnpj(target?.value || clienteCpfCnpj);
 	}
 
+	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
 		str
 			.toString()
@@ -102,10 +106,12 @@
 	let clienteModalTitle = $derived(editingClienteId ? 'Editar Cliente' : 'Adicionar Cliente');
 	let clienteSubmitLabel = $derived(editingClienteId ? 'Salvar alterações' : 'Salvar');
 
+	/** Limpa mensagens de erro do formulário de cliente. */
 	function resetClienteForm() {
 		formError = '';
 	}
 
+	/** Abre o modal para criação de um novo cliente. */
 	function openClienteModal() {
 		resetClienteForm();
 		editingClienteId = null;
@@ -114,6 +120,7 @@
 		isClienteModalOpen = true;
 	}
 
+	/** Preenche o formulário com os dados do cliente selecionado para edição. */
 	function handleEditCliente(clienteId: number) {
 		const cliente = clientes.find((item) => item.id === clienteId);
 		if (!cliente) return;
@@ -125,6 +132,7 @@
 		isClienteModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão do cliente selecionado. */
 	function handleDeleteCliente(clienteId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
 

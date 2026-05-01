@@ -31,6 +31,7 @@
 		String(data?.googleClientId || import.meta.env.PUBLIC_GOOGLE_CLIENT_ID || '').trim()
 	);
 
+	/** Prepara o estado visual durante o envio do formulário de registro. */
 	const handleRegisterSubmit = () => {
 		isSubmitting = true;
 		formError = '';
@@ -66,6 +67,7 @@
 	onMount(() => {
 		if (!googleClientId || !googleContainer) return;
 
+		/** Inicializa o botão Google e envia o token ao action server-side. */
 		const initGoogle = () => {
 			const google = (window as any)?.google;
 			if (!google?.accounts?.id) return;

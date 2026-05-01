@@ -79,6 +79,7 @@
 	let deleteCamaraForms = $state<Record<number, HTMLFormElement | undefined>>({});
 	let deleteSensorForms = $state<Record<number, HTMLFormElement | undefined>>({});
 
+	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
 		str
 			.toString()
@@ -141,6 +142,7 @@
 		return () => stopPolling;
 	});
 
+	/** Preenche e abre o modal de edição do prédio selecionado. */
 	function handleEditPredio(predioId: number) {
 		const predio = infraestrutura?.lista_predios?.find((item) => item.id === predioId);
 		if (!predio) return;
@@ -152,11 +154,13 @@
 		isPredioModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão do prédio selecionado. */
 	function handleDeletePredio(predioId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este prédio?')) return;
 		deletePredioForms[predioId]?.requestSubmit();
 	}
 
+	/** Preenche e abre o modal de edição da câmara selecionada. */
 	function handleEditCamara(camaraId: number) {
 		const camara = infraestrutura?.lista_camaras?.find((item) => item.id === camaraId);
 		if (!camara) return;
@@ -169,11 +173,13 @@
 		isCamaraModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão da câmara selecionada. */
 	function handleDeleteCamara(camaraId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir esta câmara?')) return;
 		deleteCamaraForms[camaraId]?.requestSubmit();
 	}
 
+	/** Preenche e abre o modal de edição do sensor selecionado. */
 	function handleEdit(sensorId: number) {
 		const sensor = infraestrutura?.lista_sensores?.find((item) => item.id === sensorId);
 		if (!sensor) return;
@@ -186,15 +192,18 @@
 		isSensorModalOpen = true;
 	}
 
+	/** Confirma e envia a exclusão do sensor selecionado. */
 	function handleDeleteSensor(sensorId: number) {
 		if (!window.confirm('Tem certeza que deseja excluir este sensor?')) return;
 		deleteSensorForms[sensorId]?.requestSubmit();
 	}
 
+	/** Limpa mensagens de erro dos formulários de infraestrutura. */
 	function resetFeedback() {
 		formError = '';
 	}
 
+	/** Abre o modal para criação de prédio. */
 	function openPredioModal() {
 		resetFeedback();
 		editingPredioId = null;
@@ -203,6 +212,7 @@
 		isPredioModalOpen = true;
 	}
 
+	/** Abre o modal para criação de câmara usando o primeiro prédio disponível. */
 	function openCamaraModal() {
 		resetFeedback();
 		editingCamaraId = null;
@@ -212,6 +222,7 @@
 		isCamaraModalOpen = true;
 	}
 
+	/** Abre o modal para criação de sensor usando a primeira câmara disponível. */
 	function openSensorModal() {
 		resetFeedback();
 		editingSensorId = null;

@@ -5,7 +5,14 @@ const LOGIN_API_URL = 'http://127.0.0.1:5000/api/auth/login';
 const GOOGLE_AUTH_API_URL = 'http://127.0.0.1:5000/api/auth/google';
 const GOOGLE_CONFIG_API_URL = 'http://127.0.0.1:5000/api/auth/google-config';
 
-/** @type {import('./$types').PageServerLoad} */
+/**
+ * Carrega a configuração do Google Login para a página.
+ *
+ * @param {object} input - Contexto da rota.
+ * @param {typeof fetch} input.fetch - Fetch server-side do SvelteKit.
+ * @returns {Promise<{error: null, googleClientId: string}>} Configuração inicial.
+ * @type {import('./$types').PageServerLoad}
+ */
 export async function load({ fetch }) {
     let googleClientId = (process.env.PUBLIC_GOOGLE_CLIENT_ID || '').trim();
 

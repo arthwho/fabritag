@@ -16,7 +16,7 @@
 	const error = $derived(data.error);
 	const warning = $derived(data.camara?.warning || null);
 
-	// Local helper kept only for rendering column labels in the occupancy grid.
+	/** Converte índice de coluna em letras para renderizar a grade de ocupação. */
 	function getColumnLetter(n: number): string {
 		let letter = '';
 		while (n > 0) {
@@ -42,6 +42,7 @@
 		return map;
 	});
 
+	/** Retorna o lote que ocupa a célula de linha/coluna informada. */
 	function getOccupant(r: number, c: number) {
 		const index = (r - 1) * cols + (c - 1);
 		return occupiedPositions.get(index);

@@ -24,10 +24,22 @@ GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '').strip()
 
 
 def _utcnow():
+    """Retorna o horário atual em UTC com timezone.
+
+    Usada para calcular expiração de sessões e comparar datas de forma
+    consistente no backend.
+    """
     return datetime.now(timezone.utc)
 
 
 def _hash_password(password):
+    """Gera um hash PBKDF2 seguro para uma senha.
+
+    Parâmetros:
+        password: senha em texto puro, com no mínimo 6 caracteres.
+
+    Retorna uma string com algoritmo, iterações, salt e digest para armazenar.
+    """
     if not isinstance(password, str) or len(password) < 6:
         raise ValueError('Password must have at least 6 characters')
 
@@ -37,6 +49,14 @@ def _hash_password(password):
 
 
 def _verify_password(password, password_hash):
+    """Compara uma senha em texto puro com um hash armazenado.
+
+    Parâmetros:
+        password: senha enviada pelo usuário.
+        password_hash: hash no formato produzido por _hash_password().
+
+    Retorna True quando a senha confere e False para formato inválido ou erro.
+    """
     try:
         algorithm, iterations_raw, salt, digest_hex = str(password_hash).split('$', 3)
         if algorithm != 'pbkdf2_sha256':
@@ -55,6 +75,10 @@ def _verify_password(password, password_hash):
 
 
 def _cleanup_expired_sessions():
+    """Remove sessões expiradas do registro em memória.
+
+    Usa _SESSION_LOCK para proteger o dicionário compartilhado entre requisições.
+    """
     now = _utcnow()
     with _SESSION_LOCK:
         expired = [token for token, data in _ACTIVE_SESSIONS.items() if data['expires_at'] <= now]
@@ -63,6 +87,11 @@ def _cleanup_expired_sessions():
 
 
 def _build_user_payload(row):
+    """Converte uma linha SQL de usuário no payload público da API.
+
+    Parâmetros:
+        row: tupla contendo id, nome, foto, email, cliente_id e cliente_nome.
+    """
     return {
         'id': row[0],
         'nome_completo': row[1],
@@ -74,6 +103,11 @@ def _build_user_payload(row):
 
 
 def _extract_token():
+    """Extrai o token de sessão da requisição Flask atual.
+
+    Procura primeiro no header Authorization como Bearer token e, se ausente,
+    usa X-Session-Token.
+    """
     auth_header = request.headers.get('Authorization', '').strip()
     if auth_header.lower().startswith('bearer '):
         return auth_header[7:].strip()
@@ -82,6 +116,14 @@ def _extract_token():
 
 
 def _current_session_user(require_auth=True):
+    """Valida a sessão da requisição atual.
+
+    Parâmetros:
+        require_auth: quando True, retorna resposta 401 se não houver sessão.
+
+    Retorna uma tupla (session_user, error), em que error é uma resposta Flask
+    pronta quando a autenticação falha.
+    """
     _cleanup_expired_sessions()
     token = _extract_token()
     if not token:
@@ -106,6 +148,12 @@ def _current_session_user(require_auth=True):
 
 
 def _ensure_cliente_exists(cur, cliente_id):
+    """Valida se um cliente existe quando um id foi informado.
+
+    Parâmetros:
+        cur: cursor PostgreSQL da transação atual.
+        cliente_id: id opcional do cliente.
+    """
     if cliente_id is None:
         return
 
@@ -115,18 +163,40 @@ def _ensure_cliente_exists(cur, cliente_id):
 
 
 def _only_digits(value):
+    """Remove todos os caracteres não numéricos de um valor.
+
+    Parâmetros:
+        value: CPF/CNPJ ou qualquer texto a normalizar.
+    """
     return ''.join(char for char in str(value or '') if char.isdigit())
 
 
 def _is_repeated_digits(value):
+    """Verifica se todos os dígitos de uma string são iguais.
+
+    Usada para rejeitar CPF/CNPJ como 00000000000 ou 11111111111111.
+    """
     return len(value) > 0 and all(char == value[0] for char in value)
 
 
 def _validate_cpf(digits):
+    """Valida um CPF já normalizado para apenas dígitos.
+
+    Parâmetros:
+        digits: string com 11 dígitos.
+
+    Calcula os dois dígitos verificadores e retorna True quando o CPF é válido.
+    """
     if len(digits) != 11 or _is_repeated_digits(digits):
         return False
 
     def calc_digit(base, factor):
+        """Calcula um dígito verificador de CPF.
+
+        Parâmetros:
+            base: dígitos usados no cálculo.
+            factor: multiplicador inicial decrementado a cada posição.
+        """
         total = 0
         for char in base:
             total += int(char) * factor
@@ -140,10 +210,23 @@ def _validate_cpf(digits):
 
 
 def _validate_cnpj(digits):
+    """Valida um CNPJ já normalizado para apenas dígitos.
+
+    Parâmetros:
+        digits: string com 14 dígitos.
+
+    Calcula os dois dígitos verificadores usando os pesos oficiais.
+    """
     if len(digits) != 14 or _is_repeated_digits(digits):
         return False
 
     def calc_digit(base, factors):
+        """Calcula um dígito verificador de CNPJ.
+
+        Parâmetros:
+            base: sequência base de dígitos.
+            factors: lista de pesos aplicada por posição.
+        """
         total = 0
         for idx, char in enumerate(base):
             total += int(char) * factors[idx]
@@ -156,6 +239,13 @@ def _validate_cnpj(digits):
 
 
 def _normalize_validate_cpf_cnpj(raw_value):
+    """Normaliza e valida CPF ou CNPJ.
+
+    Parâmetros:
+        raw_value: documento informado com ou sem pontuação.
+
+    Retorna somente os dígitos válidos ou lança ValueError com mensagem de API.
+    """
     digits = _only_digits(raw_value)
     if not digits:
         raise ValueError('CPF/CNPJ é obrigatório para criar cliente.')
@@ -170,6 +260,15 @@ def _normalize_validate_cpf_cnpj(raw_value):
 
 
 def _create_cliente_for_usuario(cur, cpf_cnpj, fallback_nome):
+    """Cria um cliente durante o cadastro de usuário.
+
+    Parâmetros:
+        cur: cursor PostgreSQL da transação atual.
+        cpf_cnpj: documento do novo cliente.
+        fallback_nome: nome usado quando não há razão social específica.
+
+    Retorna o id do cliente criado.
+    """
     normalized_cpf_cnpj = _normalize_validate_cpf_cnpj(cpf_cnpj)
     normalized_nome = (fallback_nome or '').strip() or 'Cliente sem nome'
 
@@ -182,6 +281,14 @@ def _create_cliente_for_usuario(cur, cpf_cnpj, fallback_nome):
 
 
 def _create_session_for_user(user_id, email):
+    """Cria uma sessão em memória para um usuário autenticado.
+
+    Parâmetros:
+        user_id: id do usuário.
+        email: email usado na sessão.
+
+    Retorna o token gerado e a data/hora de expiração.
+    """
     token = secrets.token_urlsafe(48)
     expires_at = _utcnow() + timedelta(hours=_SESSION_DURATION_HOURS)
     with _SESSION_LOCK:
@@ -194,6 +301,13 @@ def _create_session_for_user(user_id, email):
 
 
 def _verify_google_id_token(id_token):
+    """Valida um Google ID token pelo endpoint tokeninfo.
+
+    Parâmetros:
+        id_token: token recebido do login Google no frontend.
+
+    Retorna email, nome e foto normalizados quando o token é válido.
+    """
     if not id_token:
         raise ValueError('Missing required field: id_token')
 
@@ -228,6 +342,11 @@ def _verify_google_id_token(id_token):
 
 
 def init_auth_schema():
+    """Prepara colunas de autenticação e garante o usuário administrador.
+
+    Deve ser chamada na inicialização do backend para adicionar colunas faltantes
+    em USUARIO e criar/atualizar o admin padrão quando necessário.
+    """
     conn = db.get_db_connection()
     cur = conn.cursor()
     try:
@@ -262,6 +381,11 @@ def init_auth_schema():
 
 @auth_bp.route('/api/auth/login', methods=['POST'])
 def login():
+    """Autentica usuário por email e senha.
+
+    Espera JSON com email e password. Retorna token, expiração e dados do
+    usuário quando as credenciais conferem.
+    """
     payload = request.json or {}
     email = str(payload.get('email') or '').strip().lower()
     password = str(payload.get('password') or '')
@@ -306,6 +430,11 @@ def login():
 
 @auth_bp.route('/api/auth/google', methods=['POST'])
 def google_auth():
+    """Autentica ou cria usuário a partir de um Google ID token.
+
+    Espera JSON com id_token. Valida o token, atualiza dados de perfil quando
+    necessário e retorna uma sessão da API.
+    """
     payload = request.json or {}
     id_token = str(payload.get('id_token') or '').strip()
 
@@ -390,11 +519,21 @@ def google_auth():
 
 @auth_bp.route('/api/auth/google-config', methods=['GET'])
 def google_config():
+    """Expõe o GOOGLE_CLIENT_ID configurado para o frontend.
+
+    O retorno permite ao cliente inicializar o login Google com o client id
+    usado pelo backend na validação.
+    """
     return jsonify({'client_id': GOOGLE_CLIENT_ID})
 
 
 @auth_bp.route('/api/auth/session', methods=['GET'])
 def get_session():
+    """Retorna os dados da sessão autenticada atual.
+
+    Usa o token enviado nos headers, valida a sessão em memória e busca o
+    usuário atualizado no banco.
+    """
     session_user, error = _current_session_user(require_auth=True)
     if error:
         return error
@@ -428,6 +567,11 @@ def get_session():
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
 def logout():
+    """Encerra a sessão atual.
+
+    Remove o token do registro em memória quando ele existe e sempre retorna
+    sucesso para permitir logout idempotente.
+    """
     session_user, _ = _current_session_user(require_auth=False)
     if session_user:
         with _SESSION_LOCK:
@@ -438,6 +582,11 @@ def logout():
 
 @auth_bp.route('/api/usuarios', methods=['GET'])
 def list_usuarios():
+    """Lista usuários cadastrados.
+
+    Requer sessão autenticada e retorna os usuários com cliente associado e
+    indicador de existência de senha.
+    """
     _, error = _current_session_user(require_auth=True)
     if error:
         return error
@@ -473,6 +622,11 @@ def list_usuarios():
 
 @auth_bp.route('/api/usuarios', methods=['POST'])
 def create_usuario():
+    """Cria um usuário administrativo via API autenticada.
+
+    Espera JSON com nome_completo, email, password e opcionalmente cliente_id
+    ou dados para criar cliente junto ao usuário.
+    """
     _, error = _current_session_user(require_auth=True)
     if error:
         return error
@@ -545,6 +699,14 @@ def create_usuario():
 
 @auth_bp.route('/api/usuarios/<int:usuario_id>', methods=['PUT'])
 def update_usuario(usuario_id):
+    """Atualiza um usuário existente.
+
+    Parâmetros:
+        usuario_id: id recebido na rota.
+
+    Permite alterar nome, email, cliente e opcionalmente senha; se o usuário
+    editado for a sessão atual, sincroniza o email no registro em memória.
+    """
     session_user, error = _current_session_user(require_auth=True)
     if error:
         return error
@@ -634,6 +796,13 @@ def update_usuario(usuario_id):
 
 @auth_bp.route('/api/usuarios/<int:usuario_id>', methods=['DELETE'])
 def delete_usuario(usuario_id):
+    """Exclui um usuário diferente do usuário logado.
+
+    Parâmetros:
+        usuario_id: id recebido na rota.
+
+    Retorna conflito quando a requisição tenta remover a própria sessão.
+    """
     session_user, error = _current_session_user(require_auth=True)
     if error:
         return error
@@ -661,6 +830,11 @@ def delete_usuario(usuario_id):
 
 @auth_bp.route('/api/auth/register', methods=['POST'])
 def register_usuario():
+    """Registra um novo usuário sem exigir sessão prévia.
+
+    Espera JSON com nome_completo, email, password e vínculo de cliente opcional.
+    Pode criar cliente durante o registro quando create_cliente estiver ativo.
+    """
     payload = request.json or {}
     nome_completo = str(payload.get('nome_completo') or '').strip()
     email = str(payload.get('email') or '').strip().lower()
