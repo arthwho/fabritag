@@ -70,7 +70,7 @@ def _camera_capacity(cur, camara_id):
         return 0
     return res[0] or 100
 
-def _repack_open_movimentacoes(cur, camara_id, strict=True):
+def _repack_lotes_na_camara(cur, camara_id, strict=True):
     """Reorganiza posições abertas de uma câmara em blocos contíguos.
 
     Parâmetros:
@@ -83,16 +83,15 @@ def _repack_open_movimentacoes(cur, camara_id, strict=True):
     capacity = _camera_capacity(cur, camara_id)
 
     cur.execute(
-        "SELECT m.id, m.epc_tag, COALESCE(l.quantidade_atual, 1), m.posicao_vaga "
-        "FROM MOVIMENTACAO m "
-        "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
-        "WHERE m.camara_id = %s AND m.data_saida IS NULL "
-        "ORDER BY m.data_entrada ASC, m.id ASC",
+        "SELECT epc_tag, COALESCE(quantidade_atual, 1), posicao_vaga "
+        "FROM LOTE_TAGGEADO "
+        "WHERE camara_id = %s "
+        "ORDER BY data_entrada ASC NULLS LAST, epc_tag ASC",
         (camara_id,)
     )
     open_rows = cur.fetchall()
 
-    total_required = sum(_batch_size_from_qty(row[2]) for row in open_rows)
+    total_required = sum(_batch_size_from_qty(row[1]) for row in open_rows)
     if strict and total_required > capacity:
         raise ValueError(
             f"Capacidade da câmara excedida: {total_required}/{capacity}. "
@@ -100,12 +99,12 @@ def _repack_open_movimentacoes(cur, camara_id, strict=True):
         )
 
     next_pos = 0
-    for mov_id, _, qty, current_pos in open_rows:
+    for epc_tag, qty, current_pos in open_rows:
         size = _batch_size_from_qty(qty)
         if current_pos != next_pos:
             cur.execute(
-                "UPDATE MOVIMENTACAO SET posicao_vaga = %s WHERE id = %s",
-                (next_pos, mov_id),
+                "UPDATE LOTE_TAGGEADO SET posicao_vaga = %s WHERE epc_tag = %s",
+                (next_pos, epc_tag),
             )
         next_pos += size
 
@@ -136,6 +135,46 @@ def _ensure_lote_produto_assoc_table(cur):
     cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET DEFAULT 1")
     cur.execute("ALTER TABLE LOTE_PRODUTO_ASSOC ALTER COLUMN quantidade SET NOT NULL")
 
+def _ensure_lote_location_columns(cur):
+    """Garante as colunas de localização atual do lote.
+
+    Mantém o backend compatível com bancos já criados antes da remoção da
+    tabela MOVIMENTACAO.
+    """
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS camara_id INT REFERENCES CAMARA(id)")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS posicao_vaga INT")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_entrada TIMESTAMP")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_saida TIMESTAMP")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS vezes_lidas INT")
+    cur.execute("UPDATE LOTE_TAGGEADO SET vezes_lidas = 0 WHERE vezes_lidas IS NULL")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ALTER COLUMN vezes_lidas SET DEFAULT 0")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ALTER COLUMN vezes_lidas SET NOT NULL")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_lote_taggeado_camara ON LOTE_TAGGEADO(camara_id)")
+    cur.execute(
+        """
+        DO $$
+        BEGIN
+            IF to_regclass('public.movimentacao') IS NOT NULL THEN
+                UPDATE LOTE_TAGGEADO l
+                SET camara_id = m.camara_id,
+                    posicao_vaga = m.posicao_vaga,
+                    data_entrada = m.data_entrada,
+                    data_saida = NULL,
+                    status = COALESCE(l.status, 'ATIVO')
+                FROM (
+                    SELECT DISTINCT ON (epc_tag)
+                        epc_tag, camara_id, posicao_vaga, data_entrada
+                    FROM MOVIMENTACAO
+                    WHERE data_saida IS NULL
+                    ORDER BY epc_tag, data_entrada DESC, id DESC
+                ) m
+                WHERE l.epc_tag = m.epc_tag
+                AND l.camara_id IS NULL;
+            END IF;
+        END $$;
+        """
+    )
+
 def fetch_batch():
     """Lista os lotes taggeados com produtos, quantidades e localização atual.
 
@@ -146,10 +185,11 @@ def fetch_batch():
     cur = conn.cursor()
     try:
         _ensure_lote_produto_assoc_table(cur)
+        _ensure_lote_location_columns(cur)
 
         cur.execute(
             "SELECT l.epc_tag, l.produto_tipo_id, l.quantidade_atual, l.status, "
-            "COALESCE(c_atual.nome, 'Desconhecido'), m_atual.data_entrada, "
+            "COALESCE(c_atual.nome, 'Desconhecido'), l.data_entrada, "
             "COALESCE(prod_assoc.produto_ids, CASE WHEN l.produto_tipo_id IS NOT NULL THEN ARRAY[l.produto_tipo_id]::INT[] ELSE ARRAY[]::INT[] END), "
             "COALESCE(prod_assoc.produto_nomes, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[pt_legacy.nome]::TEXT[] ELSE ARRAY[]::TEXT[] END), "
             "COALESCE(prod_assoc.produto_quantidades, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[COALESCE(l.quantidade_atual, 1)]::FLOAT[] ELSE ARRAY[]::FLOAT[] END), "
@@ -165,32 +205,11 @@ def fetch_batch():
             "  LEFT JOIN PRODUTO_TIPO pt ON pt.id = lp.produto_tipo_id "
             "  WHERE lp.epc_tag = l.epc_tag"
             ") prod_assoc ON TRUE "
-            "LEFT JOIN LATERAL ("
-            "  SELECT m.camara_id, m.data_entrada "
-            "  FROM MOVIMENTACAO m "
-            "  WHERE m.epc_tag = l.epc_tag "
-            "  ORDER BY (m.data_saida IS NULL) DESC, m.data_entrada DESC "
-            "  LIMIT 1"
-            ") m_atual ON TRUE "
-            "LEFT JOIN CAMARA c_atual ON c_atual.id = m_atual.camara_id "
+            "LEFT JOIN CAMARA c_atual ON c_atual.id = l.camara_id "
             "ORDER BY l.epc_tag"
         )
         rows = cur.fetchall()
-        if not rows:
-            cur.execute(
-                "SELECT DISTINCT m.epc_tag, COALESCE(c_atual.nome, 'Desconhecido'), m_atual.data_entrada "
-                "FROM MOVIMENTACAO m "
-                "LEFT JOIN LATERAL ("
-                "  SELECT m2.camara_id, m2.data_entrada "
-                "  FROM MOVIMENTACAO m2 "
-                "  WHERE m2.epc_tag = m.epc_tag "
-                "  ORDER BY (m2.data_saida IS NULL) DESC, m2.data_entrada DESC "
-                "  LIMIT 1"
-                ") m_atual ON TRUE "
-                "LEFT JOIN CAMARA c_atual ON c_atual.id = m_atual.camara_id "
-                "ORDER BY m.epc_tag"
-            )
-            rows = [(row[0], None, None, None, row[1], row[2], [], [], [], 0) for row in cur.fetchall()]
+        conn.commit()
         return [
             {
                 "id": row[0],
@@ -611,13 +630,15 @@ def delete_camara(camara_id):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_location_columns(cur)
+
         cur.execute("SELECT COUNT(*) FROM SENSOR WHERE camara_id = %s", (camara_id,))
         if cur.fetchone()[0] > 0:
             raise ValueError("Cannot delete camara with existing sensores")
 
-        cur.execute("SELECT COUNT(*) FROM MOVIMENTACAO WHERE camara_id = %s", (camara_id,))
+        cur.execute("SELECT COUNT(*) FROM LOTE_TAGGEADO WHERE camara_id = %s", (camara_id,))
         if cur.fetchone()[0] > 0:
-            raise ValueError("Cannot delete camara with existing movimentacoes")
+            raise ValueError("Cannot delete camara with existing lotes")
 
         cur.execute("DELETE FROM CAMARA WHERE id = %s RETURNING id", (camara_id,))
         row = cur.fetchone()
@@ -717,6 +738,8 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_location_columns(cur)
+
         # 1. Register raw reading
         cur.execute(
             "INSERT INTO LEITURA_BRUTA (epc_tag, sensor_id, rssi) VALUES (%s, %s, %s)",
@@ -731,36 +754,47 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
         camara_id = camara_res[0]
 
         # 3. Ensure tag exists
-        cur.execute("INSERT INTO LOTE_TAGGEADO (epc_tag, status) VALUES (%s, %s) ON CONFLICT (epc_tag) DO NOTHING", (epc_tag, 'ATIVO'))
+        cur.execute(
+            "INSERT INTO LOTE_TAGGEADO (epc_tag, status, vezes_lidas) "
+            "VALUES (%s, %s, 0) ON CONFLICT (epc_tag) DO NOTHING",
+            (epc_tag, 'AGUARDANDO')
+        )
 
-        if event == "ARRIVED":
+        cur.execute(
+            "SELECT camara_id, quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s FOR UPDATE",
+            (epc_tag,)
+        )
+        lote_row = cur.fetchone()
+        current_camara_id = lote_row[0]
+        quantidade_atual = lote_row[1]
+
+        if current_camara_id == camara_id:
             cur.execute(
-                "SELECT id FROM MOVIMENTACAO WHERE epc_tag = %s AND camara_id = %s AND data_saida IS NULL",
-                (epc_tag, camara_id)
+                "UPDATE LOTE_TAGGEADO "
+                "SET camara_id = NULL, posicao_vaga = NULL, data_saida = NOW(), "
+                "status = %s, vezes_lidas = COALESCE(vezes_lidas, 0) + 1 "
+                "WHERE epc_tag = %s",
+                ('SAIU', epc_tag)
             )
-            if not cur.fetchone():
-                # Get batch size
-                cur.execute("SELECT quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
-                qty_res = cur.fetchone()
-                batch_size = _batch_size_from_qty(qty_res[0]) if qty_res else 1
+            _repack_lotes_na_camara(cur, camara_id, strict=False)
+        else:
+            batch_size = _batch_size_from_qty(quantidade_atual)
+            pos_vaga = _find_available_slot(cur, camara_id, batch_size, exclude_epc=epc_tag)
+            if pos_vaga is None:
+                conn.rollback()
+                return False, "No available slots in camara"
 
-                pos_vaga = _find_available_slot(cur, camara_id, batch_size)
-                if pos_vaga is None:
-                    conn.rollback()
-                    return False, "No available slots in camara"
-
-                cur.execute(
-                    "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, posicao_vaga, data_entrada) VALUES (%s, %s, %s, NOW())",
-                    (epc_tag, camara_id, pos_vaga)
-                )
-                _repack_open_movimentacoes(cur, camara_id)
-        
-        elif event == "REMOVED":
+            previous_camara_id = current_camara_id
             cur.execute(
-                "UPDATE MOVIMENTACAO SET data_saida = NOW() "
-                "WHERE epc_tag = %s AND camara_id = %s AND data_saida IS NULL",
-                (epc_tag, camara_id)
+                "UPDATE LOTE_TAGGEADO "
+                "SET camara_id = %s, posicao_vaga = %s, data_entrada = NOW(), data_saida = NULL, "
+                "status = %s, vezes_lidas = COALESCE(vezes_lidas, 0) + 1 "
+                "WHERE epc_tag = %s",
+                (camara_id, pos_vaga, 'ATIVO', epc_tag)
             )
+            if previous_camara_id:
+                _repack_lotes_na_camara(cur, previous_camara_id, strict=False)
+            _repack_lotes_na_camara(cur, camara_id)
 
         conn.commit()
         return True, "Processed successfully"
@@ -780,6 +814,8 @@ def fetch_dashboard_data():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_location_columns(cur)
+
         cur.execute("SELECT COUNT(*) FROM CAMARA")
         total_camaras = cur.fetchone()[0]
         
@@ -789,17 +825,15 @@ def fetch_dashboard_data():
         cur.execute("SELECT COUNT(DISTINCT epc_tag) FROM LOTE_TAGGEADO")
         total_lotes = cur.fetchone()[0]
 
-        cur.execute(
-            "SELECT COUNT(*) FROM MOVIMENTACAO "
-            "WHERE data_entrada::date = CURRENT_DATE"
-        )
+        cur.execute("SELECT COUNT(*) FROM LEITURA_BRUTA WHERE data_hora::date = CURRENT_DATE")
         movimentacoes_hoje = cur.fetchone()[0]
         
         cur.execute(
-            "SELECT m.id, m.epc_tag, c.nome, m.data_entrada "
-            "FROM MOVIMENTACAO m "
-            "JOIN CAMARA c ON m.camara_id = c.id "
-            "ORDER BY m.data_entrada DESC LIMIT 10"
+            "SELECT lb.id, lb.epc_tag, COALESCE(c.nome, 'Desconhecido'), lb.data_hora "
+            "FROM LEITURA_BRUTA lb "
+            "LEFT JOIN SENSOR s ON s.id = lb.sensor_id "
+            "LEFT JOIN CAMARA c ON c.id = s.camara_id "
+            "ORDER BY lb.data_hora DESC LIMIT 10"
         )
         movimentacoes = []
         for row in cur.fetchall():
@@ -811,13 +845,15 @@ def fetch_dashboard_data():
                 "data": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
             })
 
-        return {
+        result = {
             "total_camaras": total_camaras,
             "total_sensores": total_sensores,
             "total_lotes": total_lotes,
             "movimentacoes_hoje": movimentacoes_hoje,
             "ultimas_movimentacoes": movimentacoes
         }
+        conn.commit()
+        return result
     finally:
         cur.close()
         release_db_connection(conn)
@@ -1083,6 +1119,7 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
     cur = conn.cursor()
     try:
         _ensure_lote_produto_assoc_table(cur)
+        _ensure_lote_location_columns(cur)
 
         cur.execute("SELECT 1 FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
         if not cur.fetchone():
@@ -1137,15 +1174,10 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
         )
         row = cur.fetchone()
 
-        cur.execute(
-            "SELECT camara_id FROM MOVIMENTACAO "
-            "WHERE epc_tag = %s AND data_saida IS NULL "
-            "ORDER BY data_entrada DESC LIMIT 1",
-            (epc_tag,)
-        )
+        cur.execute("SELECT camara_id FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
         open_camara = cur.fetchone()
-        if open_camara:
-            _repack_open_movimentacoes(cur, open_camara[0])
+        if open_camara and open_camara[0]:
+            _repack_lotes_na_camara(cur, open_camara[0])
 
         cur.execute(
             "SELECT lp.produto_tipo_id, COALESCE(pt.nome, 'Produto sem nome'), lp.quantidade "
@@ -1193,7 +1225,9 @@ def move_lote_to_camara(epc_tag, camara_id):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
+        _ensure_lote_location_columns(cur)
+
+        cur.execute("SELECT quantidade_atual, camara_id FROM LOTE_TAGGEADO WHERE epc_tag = %s FOR UPDATE", (epc_tag,))
         lote_row = cur.fetchone()
         if not lote_row:
             raise ValueError("Lote not found")
@@ -1202,47 +1236,34 @@ def move_lote_to_camara(epc_tag, camara_id):
         if not cur.fetchone():
             raise ValueError("Camara not found")
 
-        cur.execute(
-            "SELECT id, camara_id FROM MOVIMENTACAO "
-            "WHERE epc_tag = %s AND data_saida IS NULL "
-            "ORDER BY data_entrada DESC, id DESC LIMIT 1",
-            (epc_tag,)
-        )
-        open_mov = cur.fetchone()
-
-        origem_camara_id = None
-        if open_mov:
-            origem_mov_id = open_mov[0]
-            origem_camara_id = open_mov[1]
-
-            if origem_camara_id == camara_id:
-                raise ValueError("Lote already in destination camara")
-
-            cur.execute("UPDATE MOVIMENTACAO SET data_saida = NOW() WHERE id = %s", (origem_mov_id,))
-            _repack_open_movimentacoes(cur, origem_camara_id, strict=False)
+        origem_camara_id = lote_row[1]
+        if origem_camara_id == camara_id:
+            raise ValueError("Lote already in destination camara")
 
         batch_size = _batch_size_from_qty(lote_row[0])
-        pos_vaga = _find_available_slot(cur, camara_id, batch_size)
+        pos_vaga = _find_available_slot(cur, camara_id, batch_size, exclude_epc=epc_tag)
         if pos_vaga is None:
             raise ValueError("No available slots in camara")
 
         cur.execute(
-            "INSERT INTO MOVIMENTACAO (epc_tag, camara_id, posicao_vaga, data_entrada) VALUES (%s, %s, %s, NOW()) "
-            "RETURNING id, data_entrada",
-            (epc_tag, camara_id, pos_vaga)
+            "UPDATE LOTE_TAGGEADO "
+            "SET camara_id = %s, posicao_vaga = %s, data_entrada = NOW(), data_saida = NULL, status = %s "
+            "WHERE epc_tag = %s RETURNING data_entrada",
+            (camara_id, pos_vaga, 'ATIVO', epc_tag)
         )
-        mov_row = cur.fetchone()
+        move_row = cur.fetchone()
 
-        _repack_open_movimentacoes(cur, camara_id)
+        if origem_camara_id:
+            _repack_lotes_na_camara(cur, origem_camara_id, strict=False)
+        _repack_lotes_na_camara(cur, camara_id)
 
         conn.commit()
         return {
-            "movimentacao_id": mov_row[0],
             "epc_tag": epc_tag,
             "camara_origem_id": origem_camara_id,
             "camara_destino_id": camara_id,
             "posicao_vaga": pos_vaga,
-            "data_entrada": mov_row[1].strftime("%Y-%m-%d %H:%M:%S") if mov_row[1] else None
+            "data_entrada": move_row[0].strftime("%Y-%m-%d %H:%M:%S") if move_row[0] else None
         }
     except Exception:
         conn.rollback()
@@ -1263,6 +1284,8 @@ def fetch_camara_detalhes(camara_id):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_lote_location_columns(cur)
+
         # Get camara info
         cur.execute(
             "SELECT c.id, c.nome, p.nome, c.capacidade_vagas "
@@ -1282,16 +1305,15 @@ def fetch_camara_detalhes(camara_id):
             "capacidade": camara_row[3]
         }
 
-        pack_info = _repack_open_movimentacoes(cur, camara_id, strict=False)
+        pack_info = _repack_lotes_na_camara(cur, camara_id, strict=False)
 
         # Get batches currently in this camara
         cur.execute(
-            "SELECT m.epc_tag, pt.nome, m.data_entrada, l.quantidade_atual, m.posicao_vaga "
-            "FROM MOVIMENTACAO m "
-            "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
+            "SELECT l.epc_tag, pt.nome, l.data_entrada, l.quantidade_atual, l.posicao_vaga "
+            "FROM LOTE_TAGGEADO l "
             "LEFT JOIN PRODUTO_TIPO pt ON pt.id = l.produto_tipo_id "
-            "WHERE m.camara_id = %s AND m.data_saida IS NULL "
-            "ORDER BY m.posicao_vaga ASC",
+            "WHERE l.camara_id = %s "
+            "ORDER BY l.posicao_vaga ASC NULLS LAST",
             (camara_id,)
         )
         batches = []
@@ -1309,12 +1331,13 @@ def fetch_camara_detalhes(camara_id):
         camara_info["over_capacity"] = pack_info["over_capacity"]
         if pack_info["over_capacity"]:
             camara_info["warning"] = f"Capacidade excedida: {pack_info['total_required']}/{pack_info['capacity']}"
+        conn.commit()
         return camara_info
     finally:
         cur.close()
         release_db_connection(conn)
 
-def _find_available_slot(cur, camara_id, batch_size):
+def _find_available_slot(cur, camara_id, batch_size, exclude_epc=None):
     """Localiza o primeiro intervalo contíguo de vagas livres.
 
     Parâmetros:
@@ -1329,11 +1352,11 @@ def _find_available_slot(cur, camara_id, batch_size):
 
     # 2. Get current occupancy (open movimentacoes)
     cur.execute(
-        "SELECT m.posicao_vaga, l.quantidade_atual "
-        "FROM MOVIMENTACAO m "
-        "LEFT JOIN LOTE_TAGGEADO l ON l.epc_tag = m.epc_tag "
-        "WHERE m.camara_id = %s AND m.data_saida IS NULL AND m.posicao_vaga IS NOT NULL",
-        (camara_id,)
+        "SELECT posicao_vaga, quantidade_atual "
+        "FROM LOTE_TAGGEADO "
+        "WHERE camara_id = %s AND posicao_vaga IS NOT NULL "
+        "AND (%s IS NULL OR epc_tag <> %s)",
+        (camara_id, exclude_epc, exclude_epc)
     )
     
     occupied = [False] * capacity

@@ -555,16 +555,16 @@ def delete_sensor(sensor_id):
 def handle_tag_event():
     """Recebe eventos RFID de sensores.
 
-    Espera JSON com epc_tag, sensor_id, event e rssi opcional. Encaminha o
+    Espera JSON com epc_tag, sensor_id e rssi opcional. Encaminha o
     processamento para db.process_tag_event().
     """
     data = request.json
     epc_tag = data.get('epc_tag')
     sensor_id = data.get('sensor_id')
-    event = data.get('event')
+    event = data.get('event', 'READ')
     rssi = data.get('rssi', 0)
 
-    if not epc_tag or not sensor_id or not event:
+    if not epc_tag or not sensor_id:
         return jsonify({"error": "Missing required fields"}), 400
 
     try:

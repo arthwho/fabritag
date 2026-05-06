@@ -54,8 +54,23 @@ CREATE TABLE IF NOT EXISTS LOTE_TAGGEADO (
     epc_tag VARCHAR(50) PRIMARY KEY,
     produto_tipo_id INT REFERENCES PRODUTO_TIPO(id), -- Legado: compatibilidade temporária (primeiro produto associado)
     quantidade_atual FLOAT,
-    status VARCHAR(50)
+    status VARCHAR(50),
+    camara_id INT REFERENCES CAMARA(id),
+    posicao_vaga INT,
+    data_entrada TIMESTAMP,
+    data_saida TIMESTAMP,
+    vezes_lidas INT NOT NULL DEFAULT 0
 );
+
+ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS camara_id INT REFERENCES CAMARA(id);
+ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS posicao_vaga INT;
+ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_entrada TIMESTAMP;
+ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_saida TIMESTAMP;
+ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS vezes_lidas INT NOT NULL DEFAULT 0;
+UPDATE LOTE_TAGGEADO SET vezes_lidas = 0 WHERE vezes_lidas IS NULL;
+ALTER TABLE LOTE_TAGGEADO ALTER COLUMN vezes_lidas SET DEFAULT 0;
+ALTER TABLE LOTE_TAGGEADO ALTER COLUMN vezes_lidas SET NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_lote_taggeado_camara ON LOTE_TAGGEADO(camara_id);
 
 -- Table 7.1: LOTE_PRODUTO_ASSOC (Associação N:N entre lote e produto)
 CREATE TABLE IF NOT EXISTS LOTE_PRODUTO_ASSOC (
@@ -94,17 +109,7 @@ CREATE TABLE IF NOT EXISTS LEITURA_BRUTA (
     rssi INT
 );
 
--- Table 9: MOVIMENTACAO (Fatos consolidados)
-CREATE TABLE IF NOT EXISTS MOVIMENTACAO (
-    id BIGSERIAL PRIMARY KEY,
-    epc_tag VARCHAR(50),
-    camara_id INT REFERENCES CAMARA(id),
-    posicao_vaga INT, -- Index of the starting slot (0 to capacity-1)
-    data_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    data_saida TIMESTAMP,
-    supervisor_id INT, -- A tabela USUARIO seria referenciada aqui
-    desvio_processo BOOLEAN DEFAULT FALSE
-);
+DROP TABLE IF EXISTS MOVIMENTACAO;
 
 -- Tabela 10 (novamente, listada como 10 na página 8 do PDF, mas é USUARIO)
 CREATE TABLE IF NOT EXISTS USUARIO (
