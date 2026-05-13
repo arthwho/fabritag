@@ -175,6 +175,9 @@ def _ensure_lote_location_columns(cur):
         """
     )
 
+def _ensure_leitura_bruta_movimentacao_column(cur):
+    cur.execute("ALTER TABLE LEITURA_BRUTA ADD COLUMN IF NOT EXISTS movimentacao VARCHAR(20)")
+
 def fetch_batch():
     """Lista os lotes taggeados com produtos, quantidades e localização atual.
 
@@ -738,22 +741,20 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        if str(event or '').upper() == 'REMOVED':
+            return True, "Removal ignored; next read toggles chamber state"
+
         _ensure_lote_location_columns(cur)
+        _ensure_leitura_bruta_movimentacao_column(cur)
 
-        # 1. Register raw reading
-        cur.execute(
-            "INSERT INTO LEITURA_BRUTA (epc_tag, sensor_id, rssi) VALUES (%s, %s, %s)",
-            (epc_tag, sensor_id, rssi)
-        )
-
-        # 2. Find associated camera
+        # 1. Find associated camera
         cur.execute("SELECT camara_id FROM SENSOR WHERE id = %s", (sensor_id,))
         camara_res = cur.fetchone()
         if not camara_res:
             return False, "Sensor not found in DB"
         camara_id = camara_res[0]
 
-        # 3. Ensure tag exists
+        # 2. Ensure tag exists
         cur.execute(
             "INSERT INTO LOTE_TAGGEADO (epc_tag, status, vezes_lidas) "
             "VALUES (%s, %s, 0) ON CONFLICT (epc_tag) DO NOTHING",
@@ -767,6 +768,7 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
         lote_row = cur.fetchone()
         current_camara_id = lote_row[0]
         quantidade_atual = lote_row[1]
+        movimentacao = 'Saída' if current_camara_id == camara_id else 'Entrada'
 
         if current_camara_id == camara_id:
             cur.execute(
@@ -796,8 +798,13 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
                 _repack_lotes_na_camara(cur, previous_camara_id, strict=False)
             _repack_lotes_na_camara(cur, camara_id)
 
+        cur.execute(
+            "INSERT INTO LEITURA_BRUTA (epc_tag, sensor_id, rssi, movimentacao) VALUES (%s, %s, %s, %s)",
+            (epc_tag, sensor_id, rssi, movimentacao)
+        )
+
         conn.commit()
-        return True, "Processed successfully"
+        return True, f"{movimentacao} processed successfully"
     except Exception as e:
         conn.rollback()
         raise e
@@ -815,6 +822,7 @@ def fetch_dashboard_data():
     cur = conn.cursor()
     try:
         _ensure_lote_location_columns(cur)
+        _ensure_leitura_bruta_movimentacao_column(cur)
 
         cur.execute("SELECT COUNT(*) FROM CAMARA")
         total_camaras = cur.fetchone()[0]
@@ -829,7 +837,8 @@ def fetch_dashboard_data():
         movimentacoes_hoje = cur.fetchone()[0]
         
         cur.execute(
-            "SELECT lb.id, lb.epc_tag, COALESCE(c.nome, 'Desconhecido'), lb.data_hora "
+            "SELECT lb.id, lb.epc_tag, COALESCE(c.nome, 'Desconhecido'), "
+            "COALESCE(lb.movimentacao, '-'), lb.data_hora "
             "FROM LEITURA_BRUTA lb "
             "LEFT JOIN SENSOR s ON s.id = lb.sensor_id "
             "LEFT JOIN CAMARA c ON c.id = s.camara_id "
@@ -840,9 +849,9 @@ def fetch_dashboard_data():
             movimentacoes.append({
                 "id": row[0],
                 "produto": row[1],
-                "origem": "Câmara de Testes",
-                "destino": row[2],
-                "data": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
+                "camara": row[2],
+                "movimentacao": row[3],
+                "data": row[4].strftime("%Y-%m-%d %H:%M:%S") if row[4] else None
             })
 
         result = {

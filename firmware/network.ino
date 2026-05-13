@@ -110,6 +110,7 @@ void sendTagEvent(String uid, String eventType) {
     
     HTTPClient http;
     http.begin(serverUrl);
+    http.setTimeout(2000);
     http.addHeader("Content-Type", "application/json");
 
     String jsonPayload = "{\"epc_tag\": \"" + uid + "\", \"sensor_id\": " + sensorId + ", \"event\": \"" + eventType + "\", \"rssi\": 0}";

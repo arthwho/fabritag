@@ -275,7 +275,7 @@
 		</div>
 
 		<TableSearch
-			placeholder="Buscar por produto, origem, destino ou data..."
+			placeholder="Buscar por produto, câmara, movimentação ou data..."
 			hoverable={true}
 			bind:inputValue={searchTerm}
 			divClass="overflow-hidden rounded-xl bg-white dark:bg-gray-800 shadow-none border border-gray-300 dark:border-gray-300"
@@ -284,16 +284,16 @@
 		>
 			<TableHead>
 				<TableHeadCell>Produto</TableHeadCell>
-				<TableHeadCell>Origem</TableHeadCell>
-				<TableHeadCell>Destino</TableHeadCell>
+				<TableHeadCell>Câmara</TableHeadCell>
+				<TableHeadCell>Movimentação</TableHeadCell>
 				<TableHeadCell>Data/Hora</TableHeadCell>
 			</TableHead>
 			<TableBody>
 				{#each filteredMovimentacoes as movimentacao}
 					<TableBodyRow>
 						<TableBodyCell>{movimentacao.produto}</TableBodyCell>
-						<TableBodyCell>{movimentacao.origem}</TableBodyCell>
-						<TableBodyCell>{movimentacao.destino}</TableBodyCell>
+						<TableBodyCell>{movimentacao.camara}</TableBodyCell>
+						<TableBodyCell>{movimentacao.movimentacao}</TableBodyCell>
 						<TableBodyCell>{movimentacao.data}</TableBodyCell>
 					</TableBodyRow>
 				{:else}

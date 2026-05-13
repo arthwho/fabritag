@@ -106,8 +106,11 @@ CREATE TABLE IF NOT EXISTS LEITURA_BRUTA (
     epc_tag VARCHAR(50), -- Em um cenário real, isso seria uma FK para LOTE_TAGGEADO, mas vamos manter flexível para leituras brutas.
     sensor_id INT REFERENCES SENSOR(id),
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    rssi INT
+    rssi INT,
+    movimentacao VARCHAR(20)
 );
+
+ALTER TABLE LEITURA_BRUTA ADD COLUMN IF NOT EXISTS movimentacao VARCHAR(20);
 
 DROP TABLE IF EXISTS MOVIMENTACAO;
 
