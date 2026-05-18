@@ -7,6 +7,11 @@
 #include <Adafruit_SSD1306.h>
 #include <WiFiManager.h>
 #include <Preferences.h>
+#include <esp_task_wdt.h>
+
+#ifndef ESP_ARDUINO_VERSION_MAJOR
+#define ESP_ARDUINO_VERSION_MAJOR 2
+#endif
 
 // --- DISPLAY CONFIGURATION ---
 #define SCREEN_WIDTH 128
@@ -29,6 +34,9 @@ bool shouldSaveConfig = false;
 // --- HEARTBEAT TIMER ---
 unsigned long previousPingMillis = 0;
 const unsigned long pingInterval = 10000;
+unsigned long previousWifiReconnectMillis = 0;
+const unsigned long wifiReconnectInterval = 10000;
+const int watchdogTimeoutSeconds = 15;
 
 // --- ADMIN RESET TAG ---
 // Replace this with the exact UID of the tag you want to use as a master reset key
@@ -51,8 +59,8 @@ uint8_t currentUidLength = 0;
 int missCount = 0;
 int idleMissCount = 0;
 unsigned long lastPresentLogMillis = 0;
-const int tagRemovedMissLimit = 3;
-const int nfcRecoveryMissLimit = 25;
+const int tagRemovedMissLimit = 20;
+const int nfcRecoveryMissLimit = 600;
 const unsigned long presentLogInterval = 2000;
 
 // --- CUSTOM PORTAL CSS ---
@@ -82,6 +90,8 @@ void setupWiFi();
 //void handleScreenSaver();
 void performServerHealthCheck();
 void sendTagEvent(String uid, String eventType);
+void handleWiFiConnection();
+void sendHeartbeat();
 String uidToString(uint8_t *uid, uint8_t length);
 bool initializeNfc();
 bool waitForPn5180Busy(uint8_t expectedLevel, unsigned long timeoutMs);
@@ -147,6 +157,18 @@ void setup()
   setupWiFi();
   performServerHealthCheck(); // <-- Called right here!
 
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = watchdogTimeoutSeconds * 1000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  esp_task_wdt_init(&wdt_config);
+#else
+  esp_task_wdt_init(watchdogTimeoutSeconds, true);
+#endif
+  esp_task_wdt_add(NULL);
+
   nfcReady = initializeNfc();
 
   if (nfcReady) {
@@ -158,25 +180,19 @@ void setup()
 
 void loop()
 {
+  esp_task_wdt_reset();
+
   //handleScreenSaver();
   // --- SVELTE DASHBOARD HEARTBEAT ---
+  handleWiFiConnection();
+
   if (isWifiConnected)
   {
     unsigned long currentMillis = millis();
     if (currentMillis - previousPingMillis >= pingInterval)
     {
       previousPingMillis = currentMillis;
-
-      String pingUrl = serverUrl;
-      pingUrl.replace("tag_event", "dispositivos/ping");
-
-      HTTPClient http;
-      http.begin(pingUrl);
-      http.setTimeout(2000);
-      http.addHeader("Content-Type", "application/json");
-      String jsonPayload = "{\"dispositivo_id\": " + sensorId + "}";
-      http.POST(jsonPayload);
-      http.end();
+      sendHeartbeat();
     }
   }
 
@@ -284,6 +300,7 @@ void loop()
       if (idleMissCount >= nfcRecoveryMissLimit)
       {
         idleMissCount = 0;
+        Serial.println("Idle NFC recovery check.");
         recoverNfcRf();
       }
     }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import {
 		TableSearch,
 		TableBody,
@@ -18,16 +18,24 @@
 	import { sensorStore } from '$lib/dispositivos.svelte.js';
 
 	let { data } = $props();
-	let dashboard = $derived(data.dashboard);
+	let dashboard = $state(untrack(() => data.dashboard));
+	let dashboardError = $state(untrack(() => data.error));
+	let lastDashboardUpdate = $state<Date | null>(null);
 
 	let searchTerm = $state('');
 	let dashboardFilter = $state('Hoje');
 	let selectedDate = $state<Date | undefined>(undefined);
 
 	onMount(() => {
-		// Start polling the global sensor store
 		const stopPolling = sensorStore.startPolling();
-		return () => stopPolling;
+		const dashboardInterval = setInterval(refreshDashboard, 2000);
+
+		refreshDashboard();
+
+		return () => {
+			stopPolling();
+			clearInterval(dashboardInterval);
+		};
 	});
 
 	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
@@ -47,6 +55,56 @@
 	/** Converte timestamp numérico em Date quando houver valor válido. */
 	const dateFromTimestamp = (timestamp: number | null | undefined) =>
 		typeof timestamp === 'number' ? new Date(timestamp) : null;
+
+	const parseMovimentacaoDate = (value: string | null | undefined) => {
+		if (!value) return null;
+		const [datePart, timePart = '00:00:00'] = String(value).split(' ');
+		const [year, month, day] = datePart.split('-').map(Number);
+		const [hour, minute, second] = timePart.split(':').map(Number);
+
+		if (!year || !month || !day) return null;
+		return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0);
+	};
+
+	const enrichDashboard = (dashboardData: typeof data.dashboard) => {
+		const ultimasMovimentacoes = Array.isArray(dashboardData?.ultimas_movimentacoes)
+			? dashboardData.ultimas_movimentacoes.map((item) => {
+					const date = parseMovimentacaoDate(item?.data);
+					const searchIndex = normalize(
+						[item?.produto, item?.camara, item?.movimentacao, item?.data].filter(Boolean).join(' ')
+					);
+
+					return {
+						...item,
+						date_timestamp: date ? date.getTime() : null,
+						search_index: searchIndex
+					};
+				})
+			: [];
+
+		return {
+			...dashboardData,
+			ultimas_movimentacoes: ultimasMovimentacoes
+		};
+	};
+
+	const refreshDashboard = async () => {
+		try {
+			const response = await fetch('http://127.0.0.1:5000/api/dashboard');
+			if (!response.ok) {
+				dashboardError = `Falha ao atualizar dashboard: ${response.statusText}`;
+				return;
+			}
+
+			const dashboardData = await response.json();
+			dashboard = enrichDashboard(dashboardData);
+			dashboardError = null;
+			lastDashboardUpdate = new Date();
+		} catch (error) {
+			console.error('Error refreshing dashboard:', error);
+			dashboardError = 'NÃ£o foi possÃ­vel conectar ao backend para atualizar o dashboard.';
+		}
+	};
 
 	/** Retorna a data local de ontem sem preservar hora/minuto atuais. */
 	const getYesterday = () => {
@@ -153,9 +211,9 @@
 		<h1>Monitoramento de Produção</h1>
 		<p>Visão em tempo real do fluxo de itens e análise de eficiência da linha.</p>
 	</div>
-	{#if data.error}
+	{#if dashboardError}
 		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
-			{data.error}
+			{dashboardError}
 		</div>
 	{/if}
 
@@ -273,6 +331,12 @@
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="h1 text-gray-900 dark:text-white">Últimas movimentações</h2>
 		</div>
+
+		{#if lastDashboardUpdate}
+			<div class="mb-2 text-right text-xs text-gray-500 dark:text-gray-300">
+				Atualizado {lastDashboardUpdate.toLocaleTimeString('pt-BR')}
+			</div>
+		{/if}
 
 		<TableSearch
 			placeholder="Buscar por produto, câmara, movimentação ou data..."

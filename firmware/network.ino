@@ -36,6 +36,9 @@ void setupWiFi() {
     ESP.restart();
   }
 
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   isWifiConnected = true;
   digitalWrite(LED_PIN, LOW); 
   Serial.println("\nWiFi connected.");
@@ -103,12 +106,56 @@ void performServerHealthCheck() {
 }
 // ------------------------------------
 
+void handleWiFiConnection() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!isWifiConnected) {
+      Serial.println("WiFi reconnected.");
+      updateScreen("WiFi Reconnected", WiFi.localIP().toString());
+    }
+    isWifiConnected = true;
+    return;
+  }
+
+  isWifiConnected = false;
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousWifiReconnectMillis < wifiReconnectInterval) {
+    return;
+  }
+
+  previousWifiReconnectMillis = currentMillis;
+  Serial.println("WiFi disconnected. Reconnecting...");
+  updateScreen("WiFi disconnected", "Reconnecting...");
+  WiFi.disconnect();
+  WiFi.reconnect();
+}
+
+void sendHeartbeat() {
+  String pingUrl = serverUrl;
+  pingUrl.replace("tag_event", "dispositivos/ping");
+
+  HTTPClient http;
+  http.setReuse(false);
+  http.begin(pingUrl);
+  http.setTimeout(2000);
+  http.addHeader("Content-Type", "application/json");
+
+  String jsonPayload = "{\"dispositivo_id\": " + sensorId + "}";
+  int httpResponseCode = http.POST(jsonPayload);
+  http.end();
+
+  if (httpResponseCode <= 0) {
+    Serial.println("Heartbeat failed: " + String(httpResponseCode));
+  }
+}
+
 void sendTagEvent(String uid, String eventType) {
-  if (isWifiConnected) {
+  if (isWifiConnected && WiFi.status() == WL_CONNECTED) {
     updateScreen("Tag: " + uid, "Event: " + eventType, "Syncing DB...");
     digitalWrite(LED_PIN, HIGH); 
     
     HTTPClient http;
+    http.setReuse(false);
     http.begin(serverUrl);
     http.setTimeout(2000);
     http.addHeader("Content-Type", "application/json");

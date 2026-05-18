@@ -11,6 +11,7 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "fabritag")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASS = os.getenv("DB_PASS", "1234")
+TAG_ARRIVAL_DEBOUNCE_SECONDS = 5
 
 # Initialize connection pool
 try:
@@ -741,7 +742,8 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        if str(event or '').upper() == 'REMOVED':
+        normalized_event = str(event or '').upper()
+        if normalized_event == 'REMOVED':
             return True, "Removal ignored; next read toggles chamber state"
 
         _ensure_lote_location_columns(cur)
@@ -753,6 +755,22 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
         if not camara_res:
             return False, "Sensor not found in DB"
         camara_id = camara_res[0]
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM LEITURA_BRUTA
+            WHERE epc_tag = %s
+              AND sensor_id = %s
+              AND data_hora >= NOW() - (%s * INTERVAL '1 second')
+            ORDER BY data_hora DESC
+            LIMIT 1
+            """,
+            (epc_tag, sensor_id, TAG_ARRIVAL_DEBOUNCE_SECONDS)
+        )
+        if cur.fetchone():
+            conn.commit()
+            return True, "Duplicate arrival ignored"
 
         # 2. Ensure tag exists
         cur.execute(

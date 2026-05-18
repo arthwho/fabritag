@@ -1,5 +1,3 @@
-import { onMount } from 'svelte';
-
 /**
  * A shared state for sensor statuses.
  * This can be imported into any component to get real-time status.
@@ -8,7 +6,7 @@ class SensorStore {
 	#statuses = $state({});
 	#isPolling = false;
 
-	constructor() { }
+	constructor() {}
 
 	/**
 	 * Returns the current statuses.
@@ -26,7 +24,7 @@ class SensorStore {
 
 	/**
 	 * Sets the initial statuses, e.g., from server-side data.
-	 * @param {Record<string, any>} initialStatuses 
+	 * @param {Record<string, any>} initialStatuses
 	 */
 	setInitial(initialStatuses) {
 		if (initialStatuses) {
@@ -38,8 +36,8 @@ class SensorStore {
 	 * Starts polling the sensor status API.
 	 * Call this in onMount if you want the global state to refresh.
 	 */
-	async startPolling(intervalMs = 15000) {
-		if (this.#isPolling) return;
+	startPolling(intervalMs = 15000) {
+		if (this.#isPolling) return () => {};
 		this.#isPolling = true;
 
 		const poll = async () => {
@@ -53,10 +51,9 @@ class SensorStore {
 			}
 		};
 
-		// Poll once immediately if we haven't yet
-		await poll();
-
+		poll();
 		const interval = setInterval(poll, intervalMs);
+
 		return () => {
 			clearInterval(interval);
 			this.#isPolling = false;

@@ -139,7 +139,7 @@
 	onMount(() => {
 		sensorStore.setInitial(data.liveStatuses || {});
 		const stopPolling = sensorStore.startPolling();
-		return () => stopPolling;
+		return () => stopPolling();
 	});
 
 	/** Preenche e abre o modal de edição do prédio selecionado. */
