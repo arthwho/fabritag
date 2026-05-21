@@ -22,7 +22,8 @@ export {
   TabItem,
   Modal,
   Datepicker,
-  Alert
+  Alert,
+  ButtonGroup
 } from 'flowbite-svelte';
 
 export {

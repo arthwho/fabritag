@@ -104,13 +104,3 @@
 		{/each}
 	</TableBody>
 </TableSearch>
-
-<style>
-	.h1 {
-		font-size: 24px;
-		font-family: Inter;
-		font-weight: 700;
-		line-height: 34px;
-		word-wrap: break-word;
-	}
-</style>

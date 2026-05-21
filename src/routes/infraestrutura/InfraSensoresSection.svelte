@@ -76,9 +76,12 @@
 				<TableBodyCell>{sensor.id}</TableBodyCell>
 				<TableBodyCell>{sensor.modelo}</TableBodyCell>
 				<TableBodyCell>
-					<a href={`/infraestrutura/camaras/${sensor.camara_id}`} class="flex items-center gap-2 font-medium hover:underline dark:text-white">
+					<a
+						href={`/infraestrutura/camaras/${sensor.camara_id}`}
+						class="flex items-center gap-2 font-medium hover:underline dark:text-white"
+					>
 						{sensor.camara}
-						<ChevronRightOutline class="w-4 h-4 text-gray-400" />
+						<ChevronRightOutline class="h-4 w-4 text-gray-400" />
 					</a>
 				</TableBodyCell>
 				<TableBodyCell>{sensor.dispositivo || '-'}</TableBodyCell>
@@ -105,13 +108,3 @@
 		{/each}
 	</TableBody>
 </TableSearch>
-
-<style>
-	.h1 {
-		font-size: 24px;
-		font-family: Inter;
-		font-weight: 700;
-		line-height: 34px;
-		word-wrap: break-word;
-	}
-</style>

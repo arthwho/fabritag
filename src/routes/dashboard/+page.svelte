@@ -8,10 +8,12 @@
 		TableHead,
 		TableHeadCell,
 		Button,
+		Checkbox,
 		Datepicker,
 		Dropdown,
 		DropdownItem,
-		ChevronDownOutline
+		ChevronDownOutline,
+		ButtonGroup
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 
@@ -25,6 +27,9 @@
 	let searchTerm = $state('');
 	let dashboardFilter = $state('Hoje');
 	let selectedDate = $state<Date | undefined>(undefined);
+	let selectedCamaras = $state<string[]>([]);
+	let selectedProdutos = $state<string[]>([]);
+	let selectedClientes = $state<string[]>([]);
 
 	onMount(() => {
 		const stopPolling = sensorStore.startPolling();
@@ -71,7 +76,9 @@
 			? dashboardData.ultimas_movimentacoes.map((item) => {
 					const date = parseMovimentacaoDate(item?.data);
 					const searchIndex = normalize(
-						[item?.produto, item?.camara, item?.movimentacao, item?.data].filter(Boolean).join(' ')
+						[item?.produto, item?.camara, item?.cliente, item?.movimentacao, item?.data]
+							.filter(Boolean)
+							.join(' ')
 					);
 
 					return {
@@ -102,7 +109,7 @@
 			lastDashboardUpdate = new Date();
 		} catch (error) {
 			console.error('Error refreshing dashboard:', error);
-			dashboardError = 'NÃ£o foi possÃ­vel conectar ao backend para atualizar o dashboard.';
+			dashboardError = 'Não foi possível conectar ao backend para atualizar o dashboard.';
 		}
 	};
 
@@ -201,15 +208,83 @@
 	let filteredMovimentacoes = $derived(
 		movimentacoesNoPeriodo.filter((item) => {
 			const search = normalize(searchTerm);
-			return normalize(item?.search_index || '').includes(search);
+			const matchesSearch = normalize(item?.search_index || '').includes(search);
+			const matchesCamara = selectedCamaras.length === 0 || selectedCamaras.includes(item?.camara);
+			const matchesProduto =
+				selectedProdutos.length === 0 || selectedProdutos.includes(item?.produto);
+			const matchesCliente =
+				selectedClientes.length === 0 || selectedClientes.includes(item?.cliente);
+
+			return matchesSearch && matchesCamara && matchesProduto && matchesCliente;
 		}) || []
 	);
+
+	const uniqueFilterOptions = (field: 'camara' | 'produto' | 'cliente') => {
+		const values = movimentacoesNoPeriodo
+			.map((item) => item?.[field])
+			.filter((value) => value && value !== '-');
+
+		return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+	};
+
+	let camaraOptions = $derived(uniqueFilterOptions('camara'));
+	let produtoOptions = $derived(uniqueFilterOptions('produto'));
+	let clienteOptions = $derived(uniqueFilterOptions('cliente'));
+
+	const toggleFilterValue = (
+		selectedValues: string[],
+		value: string,
+		setSelectedValues: (values: string[]) => void
+	) => {
+		setSelectedValues(
+			selectedValues.includes(value)
+				? selectedValues.filter((selectedValue) => selectedValue !== value)
+				: [...selectedValues, value]
+		);
+	};
+
+	const filterButtonLabel = (
+		selectedValues: string[],
+		emptyLabel: string,
+		singularLabel: string
+	) => {
+		if (selectedValues.length === 0) return emptyLabel;
+		if (selectedValues.length === 1) return selectedValues[0];
+		return `${selectedValues.length} ${singularLabel}s`;
+	};
+
+	const keepAvailableSelections = (selectedValues: string[], availableValues: string[]) => {
+		const filteredValues = selectedValues.filter((selectedValue) =>
+			availableValues.includes(selectedValue)
+		);
+
+		return filteredValues.length === selectedValues.length ? selectedValues : filteredValues;
+	};
+
+	$effect(() => {
+		selectedCamaras = keepAvailableSelections(selectedCamaras, camaraOptions);
+		selectedProdutos = keepAvailableSelections(selectedProdutos, produtoOptions);
+		selectedClientes = keepAvailableSelections(selectedClientes, clienteOptions);
+	});
 </script>
 
 <div class="main-content p-8">
 	<div class="header">
-		<h1>Monitoramento de Produção</h1>
-		<p>Visão em tempo real do fluxo de itens e análise de eficiência da linha.</p>
+		<div class="header-text">
+			<h1>Monitoramento de Produção</h1>
+			<p>Visão em tempo real do fluxo de itens e análise de eficiência da linha.</p>
+		</div>
+		<div class="flex gap-2">
+			<Button id="dashboard-export-btn" outline size="sm" color="dark" class="gap-2">
+				Exportar
+				<ChevronDownOutline class="h-4 w-4" />
+			</Button>
+			<Dropdown triggeredBy="#dashboard-export-btn">
+				<DropdownItem>Excel (.xlsx)</DropdownItem>
+				<DropdownItem>PDF (.pdf)</DropdownItem>
+				<DropdownItem>CSV (.csv)</DropdownItem>
+			</Dropdown>
+		</div>
 	</div>
 	{#if dashboardError}
 		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
@@ -218,65 +293,188 @@
 	{/if}
 
 	{#if dashboard}
-		<div class="mt-6 mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-			<div class="flex flex-wrap gap-2">
-				<Button
-					size="sm"
-					outline={dashboardFilter !== 'Hoje'}
-					color={dashboardFilter === 'Hoje' ? 'orange' : 'dark'}
-					onclick={() => {
-						dashboardFilter = 'Hoje';
-						selectedDate = undefined;
-					}}
-				>
-					Hoje
-				</Button>
-				<Button
-					size="sm"
-					outline={dashboardFilter !== 'Ontem'}
-					color={dashboardFilter === 'Ontem' ? 'orange' : 'dark'}
-					onclick={() => {
-						dashboardFilter = 'Ontem';
-						selectedDate = undefined;
-					}}
-				>
-					Ontem
-				</Button>
-				<Button
-					size="sm"
-					outline={dashboardFilter !== 'Todos'}
-					color={dashboardFilter === 'Todos' ? 'orange' : 'dark'}
-					onclick={() => {
-						dashboardFilter = 'Todos';
-						selectedDate = undefined;
-					}}
-				>
-					Todos
-				</Button>
-				<Button
-					size="sm"
-					outline={dashboardFilter !== 'Ultimos 7 dias'}
-					color={dashboardFilter === 'Ultimos 7 dias' ? 'orange' : 'dark'}
-					onclick={() => {
-						dashboardFilter = 'Ultimos 7 dias';
-						selectedDate = undefined;
-					}}
-				>
-					Ultimos 7 dias
-				</Button>
-				<Button
-					size="sm"
-					outline={dashboardFilter !== 'Ultimos Mês'}
-					color={dashboardFilter === 'Ultimos Mês' ? 'orange' : 'dark'}
-					onclick={() => {
-						dashboardFilter = 'Ultimos Mês';
-						selectedDate = undefined;
-					}}
-				>
-					Ultimos Mês
-				</Button>
+		<div
+			class="mt-6 mb-6 flex flex-col gap-3 min-[1440px]:flex-row min-[1440px]:items-center min-[1440px]:justify-between"
+		>
+			<div class="dashboard-filter-row">
+				<div class="flex shrink-0 gap-2">
+					<div class="flex flex-col gap-2">
+						<label for="dashboard-camara-filter-btn" class="text-text-muted text-sm font-medium">
+							Câmara
+						</label>
+						<Button id="dashboard-camara-filter-btn" outline size="sm" color="dark" class="gap-2">
+							{filterButtonLabel(selectedCamaras, 'Todas', 'selecionada')}
+							<ChevronDownOutline class="h-4 w-4" />
+						</Button>
+						<Dropdown
+							triggeredBy="#dashboard-camara-filter-btn"
+							simple
+							class="w-56 space-y-1 p-3 text-sm"
+						>
+							<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+								<Checkbox
+									checked={selectedCamaras.length === 0}
+									onchange={() => (selectedCamaras = [])}
+								>
+									Todas
+								</Checkbox>
+							</li>
+							{#each camaraOptions as option}
+								<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+									<Checkbox
+										checked={selectedCamaras.includes(option)}
+										onchange={() =>
+											toggleFilterValue(
+												selectedCamaras,
+												option,
+												(values) => (selectedCamaras = values)
+											)}
+									>
+										{option}
+									</Checkbox>
+								</li>
+							{/each}
+						</Dropdown>
+					</div>
 
-				<div class="w-full sm:w-auto">
+					<div class="flex flex-col gap-2">
+						<label for="dashboard-produto-filter-btn" class="text-text-muted text-sm font-medium">
+							Produto
+						</label>
+						<Button id="dashboard-produto-filter-btn" outline size="sm" color="dark" class="gap-2">
+							{filterButtonLabel(selectedProdutos, 'Todos', 'selecionado')}
+							<ChevronDownOutline class="h-4 w-4" />
+						</Button>
+						<Dropdown
+							triggeredBy="#dashboard-produto-filter-btn"
+							simple
+							class="w-56 space-y-1 p-3 text-sm"
+						>
+							<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+								<Checkbox
+									checked={selectedProdutos.length === 0}
+									onchange={() => (selectedProdutos = [])}
+								>
+									Todos
+								</Checkbox>
+							</li>
+							{#each produtoOptions as option}
+								<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+									<Checkbox
+										checked={selectedProdutos.includes(option)}
+										onchange={() =>
+											toggleFilterValue(
+												selectedProdutos,
+												option,
+												(values) => (selectedProdutos = values)
+											)}
+									>
+										{option}
+									</Checkbox>
+								</li>
+							{/each}
+						</Dropdown>
+					</div>
+
+					<div class="flex flex-col gap-2">
+						<label for="dashboard-cliente-filter-btn" class="text-text-muted text-sm font-medium">
+							Cliente
+						</label>
+						<Button id="dashboard-cliente-filter-btn" outline size="sm" color="dark" class="gap-2">
+							{filterButtonLabel(selectedClientes, 'Todos', 'selecionado')}
+							<ChevronDownOutline class="h-4 w-4" />
+						</Button>
+						<Dropdown
+							triggeredBy="#dashboard-cliente-filter-btn"
+							simple
+							class="w-56 space-y-1 p-3 text-sm"
+						>
+							<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+								<Checkbox
+									checked={selectedClientes.length === 0}
+									onchange={() => (selectedClientes = [])}
+								>
+									Todos
+								</Checkbox>
+							</li>
+							{#each clienteOptions as option}
+								<li class="rounded-sm p-2 hover:bg-gray-100 dark:hover:bg-gray-600">
+									<Checkbox
+										checked={selectedClientes.includes(option)}
+										onchange={() =>
+											toggleFilterValue(
+												selectedClientes,
+												option,
+												(values) => (selectedClientes = values)
+											)}
+									>
+										{option}
+									</Checkbox>
+								</li>
+							{/each}
+						</Dropdown>
+					</div>
+				</div>
+
+				<ButtonGroup>
+					<Button
+						size="sm"
+						outline={dashboardFilter !== 'Hoje'}
+						color={dashboardFilter === 'Hoje' ? 'orange' : 'dark'}
+						onclick={() => {
+							dashboardFilter = 'Hoje';
+							selectedDate = undefined;
+						}}
+					>
+						Hoje
+					</Button>
+					<Button
+						size="sm"
+						outline={dashboardFilter !== 'Ontem'}
+						color={dashboardFilter === 'Ontem' ? 'orange' : 'dark'}
+						onclick={() => {
+							dashboardFilter = 'Ontem';
+							selectedDate = undefined;
+						}}
+					>
+						Ontem
+					</Button>
+					<Button
+						size="sm"
+						outline={dashboardFilter !== 'Todos'}
+						color={dashboardFilter === 'Todos' ? 'orange' : 'dark'}
+						onclick={() => {
+							dashboardFilter = 'Todos';
+							selectedDate = undefined;
+						}}
+					>
+						Todos
+					</Button>
+					<Button
+						size="sm"
+						outline={dashboardFilter !== 'Ultimos 7 dias'}
+						color={dashboardFilter === 'Ultimos 7 dias' ? 'orange' : 'dark'}
+						onclick={() => {
+							dashboardFilter = 'Ultimos 7 dias';
+							selectedDate = undefined;
+						}}
+					>
+						Ultimos 7 dias
+					</Button>
+					<Button
+						size="sm"
+						outline={dashboardFilter !== 'Ultimos Mês'}
+						color={dashboardFilter === 'Ultimos Mês' ? 'orange' : 'dark'}
+						onclick={() => {
+							dashboardFilter = 'Ultimos Mês';
+							selectedDate = undefined;
+						}}
+					>
+						Ultimos Mês
+					</Button>
+				</ButtonGroup>
+
+				<div class="dashboard-datepicker shrink-0">
 					<Datepicker
 						color="dark"
 						placeholder="Filtrar por data"
@@ -286,18 +484,6 @@
 						inputClass="w-full sm:w-48"
 					/>
 				</div>
-			</div>
-
-			<div class="flex gap-2">
-				<Button id="dashboard-export-btn" outline size="sm" color="dark" class="gap-2">
-					Exportar
-					<ChevronDownOutline class="h-4 w-4" />
-				</Button>
-				<Dropdown triggeredBy="#dashboard-export-btn">
-					<DropdownItem>Excel (.xlsx)</DropdownItem>
-					<DropdownItem>PDF (.pdf)</DropdownItem>
-					<DropdownItem>CSV (.csv)</DropdownItem>
-				</Dropdown>
 			</div>
 		</div>
 
@@ -373,27 +559,19 @@
 </div>
 
 <style>
-	h1,
-	.h1 {
-		font-size: 24px;
-		font-family: Inter;
-		font-weight: 700;
-		line-height: 34px;
-		word-wrap: break-word;
-	}
-	p {
-		color: var(--Text-Neutral-Neutral-900, #383e41);
-		font-size: 12px;
-		font-family: Inter;
-		font-weight: 400;
-		line-height: 18px;
-		word-wrap: break-word;
+	.dashboard-filter-row {
+		display: flex;
+		width: 100%;
+		align-items: flex-end;
+		gap: 0.5rem;
+		flex-wrap: nowrap;
+		overflow: visible;
+		padding-bottom: 0.25rem;
 	}
 
-	.header {
-		width: 100%;
-		justify-content: center;
-		display: flex;
-		flex-direction: column;
+	.dashboard-filter-row :global(.inline-flex),
+	.dashboard-filter-row :global(button) {
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 </style>

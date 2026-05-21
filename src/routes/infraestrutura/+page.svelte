@@ -345,7 +345,7 @@
 </script>
 
 <div class="main-content p-8">
-	<div class="header">
+	<div class="header-text">
 		<h1>Infraestrutura</h1>
 		<p>Gestão de recursos físicos, câmaras e dispositivos de leitura.</p>
 	</div>
@@ -572,29 +572,6 @@
 </div>
 
 <style>
-	h1 {
-		font-size: 24px;
-		font-family: Inter;
-		font-weight: 700;
-		line-height: 34px;
-		word-wrap: break-word;
-	}
-	p {
-		color: var(--Text-Neutral-Neutral-900, #383e41);
-		font-size: 12px;
-		font-family: Inter;
-		font-weight: 400;
-		line-height: 18px;
-		word-wrap: break-word;
-	}
-
-	.header {
-		width: 100%;
-		justify-content: center;
-		display: flex;
-		flex-direction: column;
-	}
-
 	:global(ul),
 	:global(li) {
 		list-style-type: none !important;

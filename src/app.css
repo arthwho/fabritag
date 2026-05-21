@@ -1,8 +1,11 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
 @plugin 'flowbite/plugin';
 @custom-variant dark (&:where(.dark, .dark *));
-@source '../node_modules/flowbite-svelte/dist';
-@source '../node_modules/flowbite-svelte-icons/dist';
+/* ... */
+@source '../../node_modules/flowbite-svelte/dist';
+@source '../../node_modules/flowbite-svelte-icons/dist';
 
 @theme {
 	/* Global brand palette used by Flowbite `color="primary"` utilities */
@@ -70,7 +73,7 @@
 		background-color: #f9fafb !important;
 	}
 
-		h1,
+	h1,
 	.h1 {
 		font-size: 24px;
 		font-family: Inter;
@@ -87,9 +90,18 @@
 		word-wrap: break-word;
 	}
 
+
 	.header {
 		width: 100%;
-		justify-content: center;
+		align-items: center;
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-direction: row;
+	}
+
+	
+	.header-text {
 		display: flex;
 		flex-direction: column;
 	}
