@@ -14,9 +14,9 @@
 		{@render children()}
 	</main>
 {:else}
-	<div class="ml-72 flex min-h-screen bg-neutral-100">
+	<div class="min-h-screen bg-neutral-100 pl-72">
 		<Sidebar user={data.currentUser} />
-		<main class="flex-1">
+		<main class="min-w-0">
 			{@render children()}
 		</main>
 	</div>
