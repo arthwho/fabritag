@@ -209,8 +209,10 @@
 
 <div class="main-content p-8">
 	<div class="header">
-		<h1>Clientes</h1>
-		<p>Visão geral dos clientes cadastrados.</p>
+		<div class="header-text">
+			<h1>Clientes</h1>
+			<p>Visão geral dos clientes cadastrados.</p>
+		</div>
 	</div>
 
 	{#if data.error}

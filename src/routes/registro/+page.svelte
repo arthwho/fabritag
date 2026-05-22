@@ -105,7 +105,7 @@
 	});
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
+<div class="flex min-h-screen items-center justify-center bg-page p-6">
 	<div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
 		<div class="header mb-6">
 			<h1>Registrar Novo Usuário</h1>

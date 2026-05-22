@@ -51,15 +51,7 @@
 	const numOccupiedSpaces = $derived(camara?.ocupacao_calculada || 0);
 </script>
 
-<div class="p-6">
-	<a
-		href="/infraestrutura"
-		class="mb-6 inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-500"
-	>
-		<ChevronLeftOutline class="h-4 w-4" />
-		Voltar para Infraestrutura
-	</a>
-
+<div class="main-content p-8">
 	{#if error}
 		<div
 			class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:bg-gray-800 dark:text-red-400"
@@ -68,9 +60,18 @@
 			{error}
 		</div>
 	{:else if camara}
-		<div class="mb-8">
-			<h1 class="h1 text-gray-900 dark:text-white">{camara.nome}</h1>
-			<p class="mt-1 text-gray-500 dark:text-gray-400">ID: {camara.id} • Prédio: {camara.predio}</p>
+		<div class="header">
+			<div class="header-text">
+				<h1>{camara.nome}</h1>
+				<p>ID: {camara.id} • Prédio: {camara.predio}</p>
+			</div>
+			<a
+				href="/infraestrutura"
+				class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-500"
+			>
+				<ChevronLeftOutline class="h-4 w-4" />
+				Voltar para Infraestrutura
+			</a>
 		</div>
 
 		{#if warning}

@@ -53,8 +53,8 @@
 
 <Sidebar
 	activeUrl={$page.url.pathname}
-	class="h-screen w-72"
-	divClass="h-full flex flex-col"
+	class="h-screen w-72 border-r border-gray-200 bg-surface"
+	divClass="h-full flex flex-col bg-surface"
 	position="fixed"
 >
 	<SidebarGroup>

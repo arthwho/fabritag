@@ -10,11 +10,11 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if $page.url.pathname.startsWith('/login') || $page.url.pathname.startsWith('/registro')}
-	<main class="min-h-screen bg-neutral-100">
+	<main class="min-h-screen bg-page">
 		{@render children()}
 	</main>
 {:else}
-	<div class="min-h-screen bg-neutral-100 pl-72">
+	<div class="min-h-screen bg-page pl-72">
 		<Sidebar user={data.currentUser} />
 		<main class="min-w-0">
 			{@render children()}

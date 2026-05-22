@@ -518,12 +518,6 @@
 			<h2 class="h1 text-gray-900 dark:text-white">Últimas movimentações</h2>
 		</div>
 
-		{#if lastDashboardUpdate}
-			<div class="mb-2 text-right text-xs text-gray-500 dark:text-gray-300">
-				Atualizado {lastDashboardUpdate.toLocaleTimeString('pt-BR')}
-			</div>
-		{/if}
-
 		<TableSearch
 			placeholder="Buscar por produto, câmara, movimentação ou data..."
 			hoverable={true}
@@ -532,6 +526,15 @@
 			innerDivClass="flex flex-col md:flex-row items-center justify-between p-4 gap-4"
 			searchClass="w-full md:w-1/2"
 		>
+			{#snippet header()}
+				{#if lastDashboardUpdate}
+					<div
+						class="mb-2 rounded-md bg-gray-200 px-2.5 py-1 text-right text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+					>
+						Última atualização: {lastDashboardUpdate.toLocaleTimeString('pt-BR')}
+					</div>
+				{/if}
+			{/snippet}
 			<TableHead>
 				<TableHeadCell>Produto</TableHeadCell>
 				<TableHeadCell>Câmara</TableHeadCell>

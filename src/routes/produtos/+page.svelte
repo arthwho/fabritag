@@ -427,8 +427,10 @@
 
 <div class="main-content p-8">
 	<div class="header">
-		<h1>Produtos</h1>
-		<p>Visão geral dos produtos e lotes cadastrados.</p>
+		<div class="header-text">
+			<h1>Produtos</h1>
+			<p>Visão geral dos produtos e lotes cadastrados.</p>
+		</div>
 	</div>
 	{#if data.error}
 		<Alert class="mt-8">
