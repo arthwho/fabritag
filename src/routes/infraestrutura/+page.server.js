@@ -56,6 +56,40 @@ function parseBooleanFromFormData(rawValue) {
 	return value === 'true' || value === '1' || value === 'on';
 }
 
+function getPredioEnderecoFields(formData) {
+	return {
+		cep: toStringValue(formData.get('predioCep')),
+		logradouro: toStringValue(formData.get('predioLogradouro')),
+		numero: toStringValue(formData.get('predioNumero')),
+		complemento: toStringValue(formData.get('predioComplemento')),
+		bairro: toStringValue(formData.get('predioBairro')),
+		cidade: toStringValue(formData.get('predioCidade')),
+		estado: toStringValue(formData.get('predioEstado'))
+	};
+}
+
+function formatEndereco(endereco) {
+	const ruaNumero = [endereco.logradouro, endereco.numero].filter(Boolean).join(', ');
+	const cidadeEstado = [endereco.cidade, endereco.estado].filter(Boolean).join(' - ');
+	return [ruaNumero, endereco.complemento, endereco.bairro, cidadeEstado, endereco.cep]
+		.filter(Boolean)
+		.join(', ');
+}
+
+function getPredioFieldValues(nome, enderecoFields) {
+	return {
+		predioNome: nome,
+		predioEndereco: formatEndereco(enderecoFields),
+		predioCep: enderecoFields.cep,
+		predioLogradouro: enderecoFields.logradouro,
+		predioNumero: enderecoFields.numero,
+		predioComplemento: enderecoFields.complemento,
+		predioBairro: enderecoFields.bairro,
+		predioCidade: enderecoFields.cidade,
+		predioEstado: enderecoFields.estado
+	};
+}
+
 /**
  * Extrai mensagem de erro de uma resposta HTTP da API.
  *
@@ -127,13 +161,15 @@ export const actions = {
 	createPredio: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const nome = toStringValue(formData.get('predioNome'));
-		const endereco = toStringValue(formData.get('predioEndereco'));
+		const enderecoFields = getPredioEnderecoFields(formData);
+		const endereco = formatEndereco(enderecoFields);
+		const fieldValues = getPredioFieldValues(nome, enderecoFields);
 
 		if (!nome) {
 			return fail(400, {
 				action: 'createPredio',
 				error: 'O nome do prédio é obrigatório.',
-				fieldValues: { predioNome: nome, predioEndereco: endereco }
+				fieldValues
 			});
 		}
 
@@ -142,7 +178,8 @@ export const actions = {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				nome,
-				endereco: endereco || null
+				endereco: endereco || null,
+				endereco_detalhes: enderecoFields
 			})
 		});
 
@@ -150,7 +187,7 @@ export const actions = {
 			return fail(response.status, {
 				action: 'createPredio',
 				error: await getApiError(response, 'Não foi possível criar o prédio.'),
-				fieldValues: { predioNome: nome, predioEndereco: endereco }
+				fieldValues
 			});
 		}
 
@@ -161,7 +198,9 @@ export const actions = {
 		const formData = await request.formData();
 		const predioIdRaw = formData.get('predioId');
 		const nome = toStringValue(formData.get('predioNome'));
-		const endereco = toStringValue(formData.get('predioEndereco'));
+		const enderecoFields = getPredioEnderecoFields(formData);
+		const endereco = formatEndereco(enderecoFields);
+		const fieldValues = getPredioFieldValues(nome, enderecoFields);
 
 		let predioId = 0;
 		try {
@@ -170,7 +209,7 @@ export const actions = {
 			return fail(400, {
 				action: 'updatePredio',
 				error: error instanceof Error ? error.message : 'Prédio inválido para atualização.',
-				fieldValues: { predioNome: nome, predioEndereco: endereco }
+				fieldValues
 			});
 		}
 
@@ -178,7 +217,7 @@ export const actions = {
 			return fail(400, {
 				action: 'updatePredio',
 				error: 'O nome do prédio é obrigatório.',
-				fieldValues: { predioNome: nome, predioEndereco: endereco }
+				fieldValues
 			});
 		}
 
@@ -187,7 +226,8 @@ export const actions = {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				nome,
-				endereco: endereco || null
+				endereco: endereco || null,
+				endereco_detalhes: enderecoFields
 			})
 		});
 
@@ -195,7 +235,7 @@ export const actions = {
 			return fail(response.status, {
 				action: 'updatePredio',
 				error: await getApiError(response, 'Não foi possível atualizar o prédio.'),
-				fieldValues: { predioNome: nome, predioEndereco: endereco }
+				fieldValues
 			});
 		}
 
@@ -245,10 +285,7 @@ export const actions = {
 		} catch (error) {
 			return fail(400, {
 				action: 'createCamara',
-				error:
-					error instanceof Error
-						? error.message
-						: 'Selecione um prédio válido para a câmara.',
+				error: error instanceof Error ? error.message : 'Selecione um prédio válido para a câmara.',
 				fieldValues: {
 					camaraPredioId: toStringValue(camaraPredioIdRaw),
 					camaraNome,
@@ -330,10 +367,7 @@ export const actions = {
 		} catch (error) {
 			return fail(400, {
 				action: 'updateCamara',
-				error:
-					error instanceof Error
-						? error.message
-						: 'Dados inválidos para atualizar a câmara.',
+				error: error instanceof Error ? error.message : 'Dados inválidos para atualizar a câmara.',
 				fieldValues: {
 					camaraPredioId: toStringValue(camaraPredioIdRaw),
 					camaraNome,
@@ -433,10 +467,7 @@ export const actions = {
 
 		let camaraId = 0;
 		try {
-			camaraId = parseRequiredPositiveInteger(
-				sensorCamaraIdRaw,
-				'Selecione a câmara do sensor.'
-			);
+			camaraId = parseRequiredPositiveInteger(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
 		} catch (error) {
 			return fail(400, {
 				action: 'createSensor',
@@ -485,15 +516,11 @@ export const actions = {
 		let camaraId = 0;
 		try {
 			sensorId = parseRequiredPositiveInteger(sensorIdRaw, 'Sensor inválido para atualização.');
-			camaraId = parseRequiredPositiveInteger(
-				sensorCamaraIdRaw,
-				'Selecione a câmara do sensor.'
-			);
+			camaraId = parseRequiredPositiveInteger(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
 		} catch (error) {
 			return fail(400, {
 				action: 'updateSensor',
-				error:
-					error instanceof Error ? error.message : 'Dados inválidos para atualizar o sensor.',
+				error: error instanceof Error ? error.message : 'Dados inválidos para atualizar o sensor.',
 				fieldValues: {
 					sensorCamaraId: toStringValue(sensorCamaraIdRaw),
 					sensorModelo,

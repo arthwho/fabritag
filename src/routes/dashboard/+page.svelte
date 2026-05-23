@@ -294,11 +294,11 @@
 
 	{#if dashboard}
 		<div
-			class="mt-6 mb-6 flex flex-col gap-3 min-[1440px]:flex-row min-[1440px]:items-center min-[1440px]:justify-between"
+			class="mt-6 mb-6 flex flex-col min-[1440px]:flex-row min-[1440px]:items-center min-[1440px]:justify-between"
 		>
 			<div class="dashboard-filter-row">
-				<div class="flex shrink-0 gap-2">
-					<div class="flex flex-col gap-2">
+				<div class="flex shrink-0 gap-[var(--size-2)]">
+					<div class="flex flex-col">
 						<label for="dashboard-camara-filter-btn" class="text-text-muted text-sm font-medium">
 							Câmara
 						</label>
@@ -337,7 +337,7 @@
 						</Dropdown>
 					</div>
 
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col">
 						<label for="dashboard-produto-filter-btn" class="text-text-muted text-sm font-medium">
 							Produto
 						</label>
@@ -376,7 +376,7 @@
 						</Dropdown>
 					</div>
 
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col">
 						<label for="dashboard-cliente-filter-btn" class="text-text-muted text-sm font-medium">
 							Cliente
 						</label>
@@ -474,9 +474,8 @@
 					</Button>
 				</ButtonGroup>
 
-				<div class="dashboard-datepicker shrink-0">
+				<div class="shrink-0">
 					<Datepicker
-						color="dark"
 						placeholder="Filtrar por data"
 						locale="pt-BR"
 						dateFormat={{ year: 'numeric', month: '2-digit', day: '2-digit' }}
@@ -487,7 +486,9 @@
 			</div>
 		</div>
 
-		<div class="mt-8 mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
+		<div
+			class="mt-[var(--size-6)] mb-[var(--size-8)] grid grid-cols-1 gap-[var(--size-3)] md:grid-cols-4"
+		>
 			<InfoCard
 				data-variant="Up"
 				title="Lotes registrados"

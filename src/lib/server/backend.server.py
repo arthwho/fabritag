@@ -344,12 +344,13 @@ def create_predio():
     data = request.json or {}
     nome = data.get('nome')
     endereco = data.get('endereco')
+    endereco_data = data.get('endereco_detalhes') or data.get('endereco_data')
 
     if not nome:
         return jsonify({"error": "Missing required field: nome"}), 400
 
     try:
-        predio = db.create_predio(nome=nome, endereco=endereco)
+        predio = db.create_predio(nome=nome, endereco=endereco, endereco_data=endereco_data)
         return jsonify(predio), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -365,12 +366,18 @@ def update_predio(predio_id):
     data = request.json or {}
     nome = data.get('nome')
     endereco = data.get('endereco')
+    endereco_data = data.get('endereco_detalhes') or data.get('endereco_data')
 
     if not nome:
         return jsonify({"error": "Missing required field: nome"}), 400
 
     try:
-        predio = db.update_predio(predio_id=predio_id, nome=nome, endereco=endereco)
+        predio = db.update_predio(
+            predio_id=predio_id,
+            nome=nome,
+            endereco=endereco,
+            endereco_data=endereco_data
+        )
         return jsonify(predio), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), value_error_status(str(e))

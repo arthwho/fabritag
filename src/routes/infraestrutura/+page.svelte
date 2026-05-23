@@ -35,6 +35,13 @@
 		fieldValues?: {
 			predioNome?: string;
 			predioEndereco?: string;
+			predioCep?: string;
+			predioLogradouro?: string;
+			predioNumero?: string;
+			predioComplemento?: string;
+			predioBairro?: string;
+			predioCidade?: string;
+			predioEstado?: string;
 			camaraPredioId?: string;
 			camaraNome?: string;
 			camaraCapacidade?: string;
@@ -67,6 +74,13 @@
 
 	let predioNome = $state('');
 	let predioEndereco = $state('');
+	let predioCep = $state('');
+	let predioLogradouro = $state('');
+	let predioNumero = $state('');
+	let predioComplemento = $state('');
+	let predioBairro = $state('');
+	let predioCidade = $state('');
+	let predioEstado = $state('');
 
 	let camaraPredioId = $state('');
 	let camaraNome = $state('');
@@ -151,6 +165,13 @@
 		editingPredioId = predioId;
 		predioNome = predio.nome || '';
 		predioEndereco = predio.endereco === '-' ? '' : (predio.endereco ?? '');
+		predioCep = predio.endereco_detalhes?.cep ?? '';
+		predioLogradouro = predio.endereco_detalhes?.logradouro ?? predioEndereco;
+		predioNumero = predio.endereco_detalhes?.numero ?? '';
+		predioComplemento = predio.endereco_detalhes?.complemento ?? '';
+		predioBairro = predio.endereco_detalhes?.bairro ?? '';
+		predioCidade = predio.endereco_detalhes?.cidade ?? '';
+		predioEstado = predio.endereco_detalhes?.estado ?? '';
 		isPredioModalOpen = true;
 	}
 
@@ -209,6 +230,13 @@
 		editingPredioId = null;
 		predioNome = '';
 		predioEndereco = '';
+		predioCep = '';
+		predioLogradouro = '';
+		predioNumero = '';
+		predioComplemento = '';
+		predioBairro = '';
+		predioCidade = '';
+		predioEstado = '';
 		isPredioModalOpen = true;
 	}
 
@@ -267,6 +295,13 @@
 				editingPredioId = null;
 				predioNome = '';
 				predioEndereco = '';
+				predioCep = '';
+				predioLogradouro = '';
+				predioNumero = '';
+				predioComplemento = '';
+				predioBairro = '';
+				predioCidade = '';
+				predioEstado = '';
 				formError = '';
 				return;
 			}
@@ -278,6 +313,27 @@
 				}
 				if (typeof actionResult.fieldValues.predioEndereco === 'string') {
 					predioEndereco = actionResult.fieldValues.predioEndereco;
+				}
+				if (typeof actionResult.fieldValues.predioCep === 'string') {
+					predioCep = actionResult.fieldValues.predioCep;
+				}
+				if (typeof actionResult.fieldValues.predioLogradouro === 'string') {
+					predioLogradouro = actionResult.fieldValues.predioLogradouro;
+				}
+				if (typeof actionResult.fieldValues.predioNumero === 'string') {
+					predioNumero = actionResult.fieldValues.predioNumero;
+				}
+				if (typeof actionResult.fieldValues.predioComplemento === 'string') {
+					predioComplemento = actionResult.fieldValues.predioComplemento;
+				}
+				if (typeof actionResult.fieldValues.predioBairro === 'string') {
+					predioBairro = actionResult.fieldValues.predioBairro;
+				}
+				if (typeof actionResult.fieldValues.predioCidade === 'string') {
+					predioCidade = actionResult.fieldValues.predioCidade;
+				}
+				if (typeof actionResult.fieldValues.predioEstado === 'string') {
+					predioEstado = actionResult.fieldValues.predioEstado;
 				}
 			}
 			isPredioModalOpen = true;
@@ -550,6 +606,13 @@
 			{sensorSubmitLabel}
 			bind:predioNome
 			bind:predioEndereco
+			bind:predioCep
+			bind:predioLogradouro
+			bind:predioNumero
+			bind:predioComplemento
+			bind:predioBairro
+			bind:predioCidade
+			bind:predioEstado
 			bind:camaraPredioId
 			bind:camaraNome
 			bind:camaraCapacidade

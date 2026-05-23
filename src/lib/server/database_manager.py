@@ -179,6 +179,115 @@ def _ensure_lote_location_columns(cur):
 def _ensure_leitura_bruta_movimentacao_column(cur):
     cur.execute("ALTER TABLE LEITURA_BRUTA ADD COLUMN IF NOT EXISTS movimentacao VARCHAR(20)")
 
+def _ensure_endereco_schema(cur):
+    """Garante a tabela ENDERECO e o vinculo opcional em PREDIO.
+
+    Mantem compatibilidade com bancos criados antes da granularizacao do
+    endereco, inclusive quando a tela de infraestrutura carrega antes de uma
+    migracao manual ser aplicada.
+    """
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS ENDERECO ("
+        "id SERIAL PRIMARY KEY, "
+        "cep VARCHAR(9), "
+        "logradouro VARCHAR(150), "
+        "numero VARCHAR(20), "
+        "complemento VARCHAR(100), "
+        "bairro VARCHAR(100), "
+        "cidade VARCHAR(100), "
+        "estado VARCHAR(100)"
+        ")"
+    )
+    cur.execute("ALTER TABLE PREDIO ADD COLUMN IF NOT EXISTS endereco_id INT REFERENCES ENDERECO(id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_predio_endereco ON PREDIO(endereco_id)")
+
+def _normalize_endereco_data(endereco_data=None, endereco=None):
+    """Normaliza dados granulares de endereco recebidos da API."""
+    data = endereco_data or {}
+    normalized = {
+        "cep": (data.get("cep") or "").strip() or None,
+        "logradouro": (data.get("logradouro") or endereco or "").strip() or None,
+        "numero": (data.get("numero") or "").strip() or None,
+        "complemento": (data.get("complemento") or "").strip() or None,
+        "bairro": (data.get("bairro") or "").strip() or None,
+        "cidade": (data.get("cidade") or "").strip() or None,
+        "estado": (data.get("estado") or "").strip() or None,
+    }
+    if not any(normalized.values()):
+        return None
+    return normalized
+
+def _format_endereco(endereco):
+    """Monta o endereco legivel usado nas tabelas e filtros."""
+    if not endereco:
+        return None
+
+    line = ", ".join(
+        part for part in [endereco.get("logradouro"), endereco.get("numero")] if part
+    )
+    if endereco.get("complemento"):
+        line = f"{line} - {endereco['complemento']}" if line else endereco["complemento"]
+
+    city_state = " - ".join(part for part in [endereco.get("cidade"), endereco.get("estado")] if part)
+    pieces = [part for part in [line, endereco.get("bairro"), city_state, endereco.get("cep")] if part]
+    return ", ".join(pieces) if pieces else None
+
+def _upsert_endereco(cur, endereco_data=None, endereco=None, current_endereco_id=None):
+    """Insere ou atualiza o endereco granular e retorna id, texto e dict."""
+    normalized = _normalize_endereco_data(endereco_data, endereco)
+    if not normalized:
+        return None, None, None
+
+    values = (
+        normalized["cep"],
+        normalized["logradouro"],
+        normalized["numero"],
+        normalized["complemento"],
+        normalized["bairro"],
+        normalized["cidade"],
+        normalized["estado"],
+    )
+
+    if current_endereco_id:
+        cur.execute(
+            "UPDATE ENDERECO SET cep = %s, logradouro = %s, numero = %s, complemento = %s, "
+            "bairro = %s, cidade = %s, estado = %s WHERE id = %s "
+            "RETURNING id, cep, logradouro, numero, complemento, bairro, cidade, estado",
+            (*values, current_endereco_id)
+        )
+        row = cur.fetchone()
+        if row:
+            endereco_row = {
+                "id": row[0],
+                "cep": row[1],
+                "logradouro": row[2],
+                "numero": row[3],
+                "complemento": row[4],
+                "bairro": row[5],
+                "cidade": row[6],
+                "estado": row[7],
+            }
+            return row[0], _format_endereco(endereco_row), endereco_row
+
+    cur.execute(
+        "INSERT INTO ENDERECO (cep, logradouro, numero, complemento, bairro, cidade, estado) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+        "RETURNING id, cep, logradouro, numero, complemento, bairro, cidade, estado",
+        values
+    )
+    row = cur.fetchone()
+    endereco_row = {
+        "id": row[0],
+        "cep": row[1],
+        "logradouro": row[2],
+        "numero": row[3],
+        "complemento": row[4],
+        "bairro": row[5],
+        "cidade": row[6],
+        "estado": row[7],
+    }
+    return row[0], _format_endereco(endereco_row), endereco_row
+
 def fetch_batch():
     """Lista os lotes taggeados com produtos, quantidades e localização atual.
 
@@ -413,7 +522,7 @@ def delete_cliente(cliente_id):
         cur.close()
         release_db_connection(conn)
 
-def create_predio(nome, endereco=None):
+def create_predio(nome, endereco=None, endereco_data=None):
     """Cria um prédio para agrupar câmaras.
 
     Parâmetros:
@@ -425,16 +534,23 @@ def create_predio(nome, endereco=None):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_endereco_schema(cur)
+        endereco_id, endereco_texto, endereco_row = _upsert_endereco(cur, endereco_data, endereco)
+        legacy_endereco = endereco_texto or (endereco or None)
+
         cur.execute(
-            "INSERT INTO PREDIO (nome, endereco) VALUES (%s, %s) RETURNING id, nome, endereco",
-            (nome, endereco)
+            "INSERT INTO PREDIO (nome, endereco, endereco_id) "
+            "VALUES (%s, %s, %s) RETURNING id, nome, endereco, endereco_id",
+            (nome, legacy_endereco, endereco_id)
         )
         row = cur.fetchone()
         conn.commit()
         return {
             "id": row[0],
             "nome": row[1],
-            "endereco": row[2]
+            "endereco": row[2],
+            "endereco_id": row[3],
+            "endereco_detalhes": endereco_row
         }
     except Exception:
         conn.rollback()
@@ -523,7 +639,7 @@ def create_sensor(camara_id, modelo='PN5180', ativo=True):
         cur.close()
         release_db_connection(conn)
 
-def update_predio(predio_id, nome, endereco=None):
+def update_predio(predio_id, nome, endereco=None, endereco_data=None):
     """Atualiza nome e endereço de um prédio.
 
     Parâmetros:
@@ -534,9 +650,24 @@ def update_predio(predio_id, nome, endereco=None):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_endereco_schema(cur)
+        cur.execute("SELECT endereco_id FROM PREDIO WHERE id = %s", (predio_id,))
+        existing_row = cur.fetchone()
+        if not existing_row:
+            raise ValueError("Predio not found")
+
+        endereco_id, endereco_texto, endereco_row = _upsert_endereco(
+            cur,
+            endereco_data,
+            endereco,
+            existing_row[0]
+        )
+        legacy_endereco = endereco_texto or (endereco or None)
+
         cur.execute(
-            "UPDATE PREDIO SET nome = %s, endereco = %s WHERE id = %s RETURNING id, nome, endereco",
-            (nome, endereco, predio_id)
+            "UPDATE PREDIO SET nome = %s, endereco = %s, endereco_id = %s "
+            "WHERE id = %s RETURNING id, nome, endereco, endereco_id",
+            (nome, legacy_endereco, endereco_id, predio_id)
         )
         row = cur.fetchone()
         if not row:
@@ -546,7 +677,9 @@ def update_predio(predio_id, nome, endereco=None):
         return {
             "id": row[0],
             "nome": row[1],
-            "endereco": row[2]
+            "endereco": row[2],
+            "endereco_id": row[3],
+            "endereco_detalhes": endereco_row
         }
     except Exception:
         conn.rollback()
@@ -894,6 +1027,8 @@ def fetch_infraestrutura_data():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        _ensure_endereco_schema(cur)
+
         cur.execute("SELECT COUNT(*) FROM PREDIO")
         total_predios = cur.fetchone()[0]
 
@@ -928,10 +1063,19 @@ def fetch_infraestrutura_data():
             })
 
         cur.execute(
-            "SELECT p.id, p.nome, COALESCE(p.endereco, '-'), COUNT(c.id) "
+            "SELECT p.id, p.nome, "
+            "COALESCE(NULLIF(CONCAT_WS(', ', "
+            "NULLIF(CONCAT_WS(', ', e.logradouro, e.numero), ''), "
+            "NULLIF(e.complemento, ''), "
+            "NULLIF(e.bairro, ''), "
+            "NULLIF(CONCAT_WS(' - ', e.cidade, e.estado), ''), "
+            "NULLIF(e.cep, '')"
+            "), ''), p.endereco, '-'), "
+            "COUNT(c.id), e.id, e.cep, e.logradouro, e.numero, e.complemento, e.bairro, e.cidade, e.estado "
             "FROM PREDIO p "
+            "LEFT JOIN ENDERECO e ON e.id = p.endereco_id "
             "LEFT JOIN CAMARA c ON c.predio_id = p.id "
-            "GROUP BY p.id, p.nome, p.endereco "
+            "GROUP BY p.id, p.nome, p.endereco, e.id, e.cep, e.logradouro, e.numero, e.complemento, e.bairro, e.cidade, e.estado "
             "ORDER BY p.id DESC"
         )
         predios = []
@@ -940,7 +1084,18 @@ def fetch_infraestrutura_data():
                 "id": row[0],
                 "nome": row[1],
                 "endereco": row[2],
-                "total_camaras": row[3]
+                "total_camaras": row[3],
+                "endereco_id": row[4],
+                "endereco_detalhes": {
+                    "id": row[4],
+                    "cep": row[5],
+                    "logradouro": row[6],
+                    "numero": row[7],
+                    "complemento": row[8],
+                    "bairro": row[9],
+                    "cidade": row[10],
+                    "estado": row[11],
+                } if row[4] else None
             })
 
         cur.execute(
@@ -964,7 +1119,7 @@ def fetch_infraestrutura_data():
                 "sensores_ativos": row[6]
             })
 
-        return {
+        result = {
             "total_predios": total_predios,
             "total_camaras": total_camaras,
             "total_sensores": total_sensores,
@@ -973,6 +1128,8 @@ def fetch_infraestrutura_data():
             "lista_predios": predios,
             "lista_camaras": camaras
         }
+        conn.commit()
+        return result
     finally:
         cur.close()
         release_db_connection(conn)
