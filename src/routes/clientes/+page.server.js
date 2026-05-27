@@ -131,6 +131,8 @@ export async function load({ fetch }) {
             });
 
             return {
+                pageTitle: 'Clientes',
+                pageDescription: 'Visão geral dos clientes cadastrados.',
                 clientes: [],
                 error: 'Falha ao carregar os dados de clientes.'
             };
@@ -139,12 +141,16 @@ export async function load({ fetch }) {
         const clientesData = await clientesRes.json();
 
         return {
+            pageTitle: 'Clientes',
+            pageDescription: 'Visão geral dos clientes cadastrados.',
             clientes: clientesData || [],
             error: null
         };
     } catch (error) {
         console.error('Error fetching clientes page data:', error);
         return {
+            pageTitle: 'Clientes',
+            pageDescription: 'Visão geral dos clientes cadastrados.',
             clientes: [],
             error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
         };

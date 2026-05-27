@@ -6,8 +6,7 @@
 		TableBodyRow,
 		TableHead,
 		TableHeadCell,
-		Badge,
-		ChevronLeftOutline
+		Badge
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 
@@ -60,20 +59,6 @@
 			{error}
 		</div>
 	{:else if camara}
-		<div class="header">
-			<div class="header-text">
-				<h1>{camara.nome}</h1>
-				<p>ID: {camara.id} • Prédio: {camara.predio}</p>
-			</div>
-			<a
-				href="/infraestrutura"
-				class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-500"
-			>
-				<ChevronLeftOutline class="h-4 w-4" />
-				Voltar para Infraestrutura
-			</a>
-		</div>
-
 		{#if warning}
 			<div
 				class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-gray-800 dark:text-amber-300"
@@ -83,85 +68,92 @@
 			</div>
 		{/if}
 
-		<div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
-			<InfoCard title="Capacidade" description="Total de vagas físicas" value={capacity || 'N/A'} />
-			<InfoCard
-				title="Ocupação"
-				description="Espaços físicos ocupados"
-				value={`${camara.ocupacao_total ?? numOccupiedSpaces} / ${capacity}`}
-			/>
-			<InfoCard title="Status" description="Estado de operação" value="Operacional">
-				{#snippet badge()}
-					<Badge color="green" class="rounded-full">Ativo</Badge>
-				{/snippet}
-			</InfoCard>
-		</div>
-
-		<!-- 2D Grid Representation -->
-		<div
-			class="mb-10 rounded-xl border border-gray-300 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
-		>
-			<div class="mb-6 flex items-center justify-between">
-				<div>
-					<h2 class="text-lg font-bold text-gray-900 dark:text-white">Mapa de Ocupação</h2>
-					<p class="text-xs text-gray-500">Representação visual das prateleiras industriais</p>
-				</div>
-				<div class="flex gap-4 text-xs">
-					<div class="flex items-center gap-1.5">
-						<div class="h-3 w-3 rounded-sm bg-orange-500"></div>
-						<span class="text-gray-600 dark:text-gray-400">Ocupado</span>
+		<div class="info-cards mt-8 mb-1 grid grid-cols-1 gap-6 md:grid-cols-3">
+			<div
+				class="rounded-xl border border-gray-300 bg-white p-6 md:col-span-2 md:row-span-2 md:mb-6 dark:border-gray-700 dark:bg-gray-800"
+			>
+				<div class="mb-6 flex items-center justify-between">
+					<div>
+						<h2 class="text-lg font-bold text-gray-900 dark:text-white">Mapa de Ocupação</h2>
+						<p class="text-xs text-gray-500">Representação visual das prateleiras industriais</p>
 					</div>
-					<div class="flex items-center gap-1.5">
-						<div
-							class="h-3 w-3 rounded-sm border border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-700"
-						></div>
-						<span class="text-gray-600 dark:text-gray-400">Disponível</span>
+					<div class="flex gap-4 text-xs">
+						<div class="flex items-center gap-1.5">
+							<div class="h-3 w-3 rounded-sm bg-orange-500"></div>
+							<span class="text-gray-600 dark:text-gray-400">Ocupado</span>
+						</div>
+						<div class="flex items-center gap-1.5">
+							<div
+								class="h-3 w-3 rounded-sm border border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-700"
+							></div>
+							<span class="text-gray-600 dark:text-gray-400">Disponível</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="overflow-x-auto pb-2">
+					<div
+						class="inline-grid gap-2"
+						style="grid-template-columns: auto repeat({cols}, minmax(40px, 1fr));"
+					>
+						<!-- Header Row (Columns A, B, C...) -->
+						<div class="w-8"></div>
+						{#each Array(cols) as _, c}
+							<div class="text-center text-[10px] font-bold text-gray-400 uppercase">
+								{getColumnLetter(c + 1)}
+							</div>
+						{/each}
+
+						<!-- Grid Rows -->
+						{#each Array(rows) as _, r}
+							<!-- Row Label (1, 2, 3...) -->
+							<div class="flex items-center justify-end pr-2 text-[10px] font-bold text-gray-400">
+								{r + 1}
+							</div>
+
+							{#each Array(cols) as _, c}
+								{@const cellIndex = r * cols + c}
+								{@const occupant = getOccupant(r + 1, c + 1)}
+								{#if cellIndex < capacity}
+									<div
+										class="flex aspect-square items-center justify-center rounded-md border transition-all duration-200 {occupant
+											? 'border-orange-600 bg-orange-500 shadow-sm'
+											: 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/30'}"
+										title={occupant
+											? `Lote: ${occupant.epc_tag}\nPosição: ${getColumnLetter(c + 1)}${r + 1}`
+											: `Posição ${getColumnLetter(c + 1)}${r + 1}: Disponível`}
+									>
+										{#if occupant}
+											<div class="h-1.5 w-1.5 animate-pulse rounded-full bg-white/40"></div>
+										{/if}
+									</div>
+								{:else}
+									<div class="aspect-square"></div>
+								{/if}
+							{/each}
+						{/each}
 					</div>
 				</div>
 			</div>
 
-			<div class="overflow-x-auto pb-2">
-				<div
-					class="inline-grid gap-2"
-					style="grid-template-columns: auto repeat({cols}, minmax(40px, 1fr));"
-				>
-					<!-- Header Row (Columns A, B, C...) -->
-					<div class="w-8"></div>
-					{#each Array(cols) as _, c}
-						<div class="text-center text-[10px] font-bold text-gray-400 uppercase">
-							{getColumnLetter(c + 1)}
-						</div>
-					{/each}
-
-					<!-- Grid Rows -->
-					{#each Array(rows) as _, r}
-						<!-- Row Label (1, 2, 3...) -->
-						<div class="flex items-center justify-end pr-2 text-[10px] font-bold text-gray-400">
-							{r + 1}
-						</div>
-
-						{#each Array(cols) as _, c}
-							{@const cellIndex = r * cols + c}
-							{@const occupant = getOccupant(r + 1, c + 1)}
-							{#if cellIndex < capacity}
-								<div
-									class="flex aspect-square items-center justify-center rounded-md border transition-all duration-200 {occupant
-										? 'border-orange-600 bg-orange-500 shadow-sm'
-										: 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/30'}"
-									title={occupant
-										? `Lote: ${occupant.epc_tag}\nPosição: ${getColumnLetter(c + 1)}${r + 1}`
-										: `Posição ${getColumnLetter(c + 1)}${r + 1}: Disponível`}
-								>
-									{#if occupant}
-										<div class="h-1.5 w-1.5 animate-pulse rounded-full bg-white/40"></div>
-									{/if}
-								</div>
-							{:else}
-								<div class="aspect-square"></div>
-							{/if}
-						{/each}
-					{/each}
-				</div>
+			<div class="flex flex-col gap-6">
+				<InfoCard
+					title="Capacidade"
+					description="Total de vagas físicas"
+					value={capacity || 'N/A'}
+				/>
+				<InfoCard
+					title="Ocupação"
+					description="Espaços físicos ocupados"
+					value={`${camara.ocupacao_total ?? numOccupiedSpaces} / ${capacity}`}
+				/>
+				<!--
+				<InfoCard title="Status" description="Estado de operação" value="Operacional">
+					{#snippet badge()}
+						<Badge color="green" class="rounded-full">Ativo</Badge>
+					{/snippet}
+				</InfoCard>
+				-->
 			</div>
 		</div>
 

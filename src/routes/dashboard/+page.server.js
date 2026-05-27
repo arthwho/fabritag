@@ -70,6 +70,8 @@ export async function load({ fetch }) {
 		if (response.ok) {
 			const dashboardData = await response.json();
 			return {
+				pageTitle: 'Monitoramento de Produção',
+				pageDescription: 'Visão em tempo real do fluxo de itens e análise de eficiência da linha.',
 				dashboard: enrichMovimentacoes(dashboardData),
 				error: null
 			};
@@ -83,12 +85,16 @@ export async function load({ fetch }) {
 			errorText
 		);
 		return {
+			pageTitle: 'Monitoramento de Produção',
+			pageDescription: 'Visão em tempo real do fluxo de itens e análise de eficiência da linha.',
 			dashboard: null,
 			error: `Falha ao carregar os dados do dashboard: ${response.statusText}`
 		};
 	} catch (error) {
 		console.error('Error fetching dashboard data:', error);
 		return {
+			pageTitle: 'Monitoramento de Produção',
+			pageDescription: 'Visão em tempo real do fluxo de itens e análise de eficiência da linha.',
 			dashboard: null,
 			error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
 		};

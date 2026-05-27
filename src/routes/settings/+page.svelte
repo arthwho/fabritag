@@ -14,13 +14,6 @@
 </script>
 
 <div class="main-content p-8">
-	<div class="header">
-		<div class="header-text">
-			<h1>Configurações</h1>
-			<p>Gerencie suas preferências e configurações de conta.</p>
-		</div>
-	</div>
-
 	<h2 class="h1">Configurar meu fabritag</h2>
 
 	<div class="mt-6 mb-6">

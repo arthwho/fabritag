@@ -208,13 +208,6 @@
 </script>
 
 <div class="main-content p-8">
-	<div class="header">
-		<div class="header-text">
-			<h1>Clientes</h1>
-			<p>Visão geral dos clientes cadastrados.</p>
-		</div>
-	</div>
-
 	{#if data.error}
 		<Alert class="mt-8">
 			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}

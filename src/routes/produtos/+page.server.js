@@ -132,6 +132,8 @@ export async function load({ fetch }) {
                 camarasText
             });
             return {
+                pageTitle: 'Produtos',
+                pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
                 produtos: [],
                 lotes: [],
                 lotesSemProduto: [],
@@ -147,6 +149,8 @@ export async function load({ fetch }) {
         const camarasData = await camarasRes.json();
 
         return {
+            pageTitle: 'Produtos',
+            pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
             produtos: produtosData.produtos || [],
             lotes: batchesData || [],
             lotesSemProduto: produtosData.lotes_sem_produto || [],
@@ -157,6 +161,8 @@ export async function load({ fetch }) {
     } catch (error) {
         console.error('Error fetching produtos page data:', error);
         return {
+            pageTitle: 'Produtos',
+            pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
             produtos: [],
             lotes: [],
             lotesSemProduto: [],

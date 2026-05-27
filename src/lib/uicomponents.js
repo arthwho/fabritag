@@ -39,5 +39,6 @@ export {
   ChevronLeftOutline,
   ChevronRightOutline,
   InfoCircleSolid,
-  UserAddSolid
+  UserAddSolid,
+  FileExportOutline
 } from 'flowbite-svelte-icons';

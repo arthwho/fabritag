@@ -135,6 +135,8 @@ export async function load({ fetch }) {
 			const errorText = await infraRes.text();
 			console.error('Failed to fetch infraestrutura data:', infraRes.status, errorText);
 			return {
+				pageTitle: 'Infraestrutura',
+				pageDescription: 'Gestão de recursos físicos, câmaras e dispositivos de leitura.',
 				infraestrutura: null,
 				liveStatuses,
 				error: `Falha ao carregar os dados da infraestrutura: ${infraRes.statusText}`
@@ -142,6 +144,8 @@ export async function load({ fetch }) {
 		}
 
 		return {
+			pageTitle: 'Infraestrutura',
+			pageDescription: 'Gestão de recursos físicos, câmaras e dispositivos de leitura.',
 			infraestrutura: infraData,
 			liveStatuses,
 			error: null
@@ -149,6 +153,8 @@ export async function load({ fetch }) {
 	} catch (error) {
 		console.error('Error fetching infraestrutura data:', error);
 		return {
+			pageTitle: 'Infraestrutura',
+			pageDescription: 'Gestão de recursos físicos, câmaras e dispositivos de leitura.',
 			infraestrutura: null,
 			liveStatuses: {},
 			error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'

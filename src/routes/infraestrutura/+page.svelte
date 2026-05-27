@@ -401,10 +401,6 @@
 </script>
 
 <div class="main-content p-8">
-	<div class="header-text">
-		<h1>Infraestrutura</h1>
-		<p>Gestão de recursos físicos, câmaras e dispositivos de leitura.</p>
-	</div>
 	{#if data.error}
 		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
 			{data.error}

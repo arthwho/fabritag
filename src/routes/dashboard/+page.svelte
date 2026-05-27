@@ -13,7 +13,8 @@
 		Dropdown,
 		DropdownItem,
 		ChevronDownOutline,
-		ButtonGroup
+		ButtonGroup,
+		FileExportOutline
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
 
@@ -269,23 +270,6 @@
 </script>
 
 <div class="main-content p-8">
-	<div class="header">
-		<div class="header-text">
-			<h1>Monitoramento de Produção</h1>
-			<p>Visão em tempo real do fluxo de itens e análise de eficiência da linha.</p>
-		</div>
-		<div class="flex gap-2">
-			<Button id="dashboard-export-btn" outline size="sm" color="dark" class="gap-2">
-				Exportar
-				<ChevronDownOutline class="h-4 w-4" />
-			</Button>
-			<Dropdown triggeredBy="#dashboard-export-btn">
-				<DropdownItem>Excel (.xlsx)</DropdownItem>
-				<DropdownItem>PDF (.pdf)</DropdownItem>
-				<DropdownItem>CSV (.csv)</DropdownItem>
-			</Dropdown>
-		</div>
-	</div>
 	{#if dashboardError}
 		<div class="mt-4 rounded-lg bg-red-100 p-4 text-center text-red-700">
 			{dashboardError}
@@ -298,7 +282,7 @@
 		>
 			<div class="dashboard-filter-row">
 				<div class="flex shrink-0 gap-[var(--size-2)]">
-					<div class="flex flex-col">
+					<div class="flex flex-col gap-[var(--size-1)]">
 						<label for="dashboard-camara-filter-btn" class="text-text-muted text-sm font-medium">
 							Câmara
 						</label>
@@ -337,7 +321,7 @@
 						</Dropdown>
 					</div>
 
-					<div class="flex flex-col">
+					<div class="flex flex-col gap-[var(--size-1)]">
 						<label for="dashboard-produto-filter-btn" class="text-text-muted text-sm font-medium">
 							Produto
 						</label>
@@ -376,7 +360,7 @@
 						</Dropdown>
 					</div>
 
-					<div class="flex flex-col">
+					<div class="flex flex-col gap-[var(--size-1)]">
 						<label for="dashboard-cliente-filter-btn" class="text-text-muted text-sm font-medium">
 							Cliente
 						</label>
@@ -474,14 +458,27 @@
 					</Button>
 				</ButtonGroup>
 
-				<div class="shrink-0">
+				<div class="dashboard-datepicker shrink-0">
 					<Datepicker
 						placeholder="Filtrar por data"
 						locale="pt-BR"
 						dateFormat={{ year: 'numeric', month: '2-digit', day: '2-digit' }}
 						bind:value={selectedDate}
-						inputClass="w-full sm:w-48"
+						inputClass="w-full sm:w-48 placeholder:text-gray-500"
 					/>
+				</div>
+
+				<div class="export ml-auto">
+					<Button id="dashboard-export-btn" outline size="sm" color="dark" class="gap-2">
+						<FileExportOutline class="h-4 w-4 shrink-0" />
+						Exportar visualização
+						<ChevronDownOutline class="h-4 w-4" />
+					</Button>
+					<Dropdown triggeredBy="#dashboard-export-btn">
+						<DropdownItem>Excel (.xlsx)</DropdownItem>
+						<DropdownItem>PDF (.pdf)</DropdownItem>
+						<DropdownItem>CSV (.csv)</DropdownItem>
+					</Dropdown>
 				</div>
 			</div>
 		</div>
@@ -570,12 +567,26 @@
 		gap: 0.5rem;
 		flex-wrap: nowrap;
 		overflow: visible;
-		padding-bottom: 0.25rem;
 	}
 
 	.dashboard-filter-row :global(.inline-flex),
 	.dashboard-filter-row :global(button) {
 		flex-shrink: 0;
 		white-space: nowrap;
+	}
+
+	.dashboard-filter-row :global(.dashboard-datepicker button svg),
+	.dashboard-filter-row :global(.dashboard-datepicker button svg.text-gray-500),
+	.dashboard-filter-row :global(.dashboard-datepicker button svg.dark\:text-gray-400) {
+		color: var(--color-gray-400) !important;
+	}
+
+	:global(.dark) .dashboard-filter-row :global(.dashboard-datepicker button svg),
+	:global(.dark) .dashboard-filter-row :global(.dashboard-datepicker button svg.text-gray-500),
+	:global(.dark)
+		.dashboard-filter-row
+		:global(.dashboard-datepicker button svg.dark\:text-gray-400) {
+		color: rgb(209 213 219) !important;
+		fill: currentColor;
 	}
 </style>

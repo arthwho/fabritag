@@ -76,6 +76,10 @@ export async function load({ params, fetch }) {
 			const errorText = await res.text();
 			console.error(`Failed to fetch camara ${id} details:`, res.status, errorText);
 			return {
+				pageTitle: 'Câmara',
+				pageDescription: `Detalhes da câmara ${id}.`,
+				pageBackHref: '/infraestrutura',
+				pageBackLabel: 'Voltar para Infraestrutura',
 				camara: null,
 				error: `Falha ao carregar os detalhes da câmara: ${res.statusText}`
 			};
@@ -84,12 +88,22 @@ export async function load({ params, fetch }) {
 		const camaraData = await res.json();
 
 		return {
+			pageTitle: camaraData?.nome ? camaraData.nome : 'Câmara',
+			pageDescription: camaraData?.id
+				? `ID: ${camaraData.id} • Prédio: ${camaraData.predio}`
+				: `Detalhes da câmara ${id}.`,
+			pageBackHref: '/infraestrutura',
+			pageBackLabel: 'Voltar para Infraestrutura',
 			camara: enrichCamara(camaraData),
 			error: null
 		};
 	} catch (error) {
 		console.error(`Error fetching camara ${id} data:`, error);
 		return {
+			pageTitle: 'Câmara',
+			pageDescription: `Detalhes da câmara ${id}.`,
+			pageBackHref: '/infraestrutura',
+			pageBackLabel: 'Voltar para Infraestrutura',
 			camara: null,
 			error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
 		};

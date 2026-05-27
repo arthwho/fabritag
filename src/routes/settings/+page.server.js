@@ -14,16 +14,22 @@ export async function load({ fetch }) {
 		if (response.ok) {
 			const sensorStatus = await response.json();
 			return {
+				pageTitle: 'Configurações',
+				pageDescription: 'Gerencie suas preferências e configurações de conta.',
 				sensorStatus
 			};
 		}
 
 		return {
+			pageTitle: 'Configurações',
+			pageDescription: 'Gerencie suas preferências e configurações de conta.',
 			sensorStatus: { status: 'Offline', ip_address: 'N/A' }
 		};
 	} catch (error) {
 		console.error('Error fetching dispositivo status:', error);
 		return {
+			pageTitle: 'Configurações',
+			pageDescription: 'Gerencie suas preferências e configurações de conta.',
 			sensorStatus: { status: 'Offline', ip_address: 'N/A' }
 		};
 	}

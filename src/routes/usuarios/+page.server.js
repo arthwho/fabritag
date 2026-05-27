@@ -180,6 +180,8 @@ export async function load(event) {
             });
 
             return {
+                pageTitle: 'Usuários',
+                pageDescription: 'Visão geral dos usuários cadastrados.',
                 usuarios: [],
                 clientes: [],
                 error: 'Falha ao carregar os dados de usuários.'
@@ -190,6 +192,8 @@ export async function load(event) {
         const clientesData = await clientesRes.json();
 
         return {
+            pageTitle: 'Usuários',
+            pageDescription: 'Visão geral dos usuários cadastrados.',
             usuarios: usuariosData || [],
             clientes: clientesData || [],
             error: null
@@ -197,6 +201,8 @@ export async function load(event) {
     } catch (error) {
         console.error('Error fetching usuarios page data:', error);
         return {
+            pageTitle: 'Usuários',
+            pageDescription: 'Visão geral dos usuários cadastrados.',
             usuarios: [],
             clientes: [],
             error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
