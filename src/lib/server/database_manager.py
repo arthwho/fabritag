@@ -179,6 +179,164 @@ def _ensure_lote_location_columns(cur):
 def _ensure_leitura_bruta_movimentacao_column(cur):
     cur.execute("ALTER TABLE LEITURA_BRUTA ADD COLUMN IF NOT EXISTS movimentacao VARCHAR(20)")
 
+def _ensure_movement_history_schema(cur):
+    """Garante tabelas append-only para historico analitico de movimentacoes."""
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE ("
+        "id BIGSERIAL PRIMARY KEY, "
+        "epc_tag VARCHAR(50), "
+        "tipo_movimentacao VARCHAR(20) NOT NULL, "
+        "camara_origem_id INT REFERENCES CAMARA(id) ON DELETE SET NULL, "
+        "camara_destino_id INT REFERENCES CAMARA(id) ON DELETE SET NULL, "
+        "sensor_id INT REFERENCES SENSOR(id) ON DELETE SET NULL, "
+        "leitura_bruta_id BIGINT REFERENCES LEITURA_BRUTA(id) ON DELETE SET NULL, "
+        "posicao_vaga INT, "
+        "quantidade_total_snapshot FLOAT NOT NULL DEFAULT 0, "
+        "ocupacao_origem_snapshot INT, "
+        "capacidade_origem_snapshot INT, "
+        "ocupacao_destino_snapshot INT, "
+        "capacidade_destino_snapshot INT, "
+        "rssi INT, "
+        "origem_evento VARCHAR(30), "
+        "data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")"
+    )
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE_PRODUTO ("
+        "id BIGSERIAL PRIMARY KEY, "
+        "movimentacao_id BIGINT REFERENCES MOVIMENTACAO_LOTE(id) ON DELETE CASCADE, "
+        "produto_tipo_id INT REFERENCES PRODUTO_TIPO(id) ON DELETE SET NULL, "
+        "produto_nome_snapshot VARCHAR(100), "
+        "sku_snapshot VARCHAR(50), "
+        "unidade_medida_snapshot VARCHAR(20), "
+        "quantidade_snapshot FLOAT NOT NULL DEFAULT 0"
+        ")"
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_epc ON MOVIMENTACAO_LOTE(epc_tag)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_data ON MOVIMENTACAO_LOTE(data_hora)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_destino ON MOVIMENTACAO_LOTE(camara_destino_id, data_hora)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_origem ON MOVIMENTACAO_LOTE(camara_origem_id, data_hora)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_produto_mov ON MOVIMENTACAO_LOTE_PRODUTO(movimentacao_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_produto_produto ON MOVIMENTACAO_LOTE_PRODUTO(produto_tipo_id, movimentacao_id)")
+
+def _camera_occupancy_snapshot(cur, camara_id):
+    """Retorna ocupacao e capacidade atuais de uma camara para historico."""
+    if not camara_id:
+        return None, None
+
+    capacity = _camera_capacity(cur, camara_id)
+    cur.execute(
+        "SELECT COALESCE(quantidade_atual, 1) "
+        "FROM LOTE_TAGGEADO "
+        "WHERE camara_id = %s",
+        (camara_id,)
+    )
+    occupied = sum(_batch_size_from_qty(row[0]) for row in cur.fetchall())
+    return occupied, capacity
+
+def _lote_product_snapshots(cur, epc_tag):
+    """Busca produtos e quantidades do lote para gravar snapshot historico."""
+    _ensure_lote_produto_assoc_table(cur)
+
+    cur.execute(
+        "SELECT lp.produto_tipo_id, pt.nome, pt.sku, pt.unidade_medida, lp.quantidade "
+        "FROM LOTE_PRODUTO_ASSOC lp "
+        "LEFT JOIN PRODUTO_TIPO pt ON pt.id = lp.produto_tipo_id "
+        "WHERE lp.epc_tag = %s "
+        "ORDER BY lp.produto_tipo_id",
+        (epc_tag,)
+    )
+    rows = cur.fetchall()
+
+    if not rows:
+        cur.execute(
+            "SELECT l.produto_tipo_id, pt.nome, pt.sku, pt.unidade_medida, COALESCE(l.quantidade_atual, 0) "
+            "FROM LOTE_TAGGEADO l "
+            "LEFT JOIN PRODUTO_TIPO pt ON pt.id = l.produto_tipo_id "
+            "WHERE l.epc_tag = %s AND l.produto_tipo_id IS NOT NULL",
+            (epc_tag,)
+        )
+        rows = cur.fetchall()
+
+    products = [
+        {
+            "produto_tipo_id": row[0],
+            "produto_nome_snapshot": row[1],
+            "sku_snapshot": row[2],
+            "unidade_medida_snapshot": row[3],
+            "quantidade_snapshot": float(row[4] or 0),
+        }
+        for row in rows
+    ]
+
+    cur.execute("SELECT COALESCE(quantidade_atual, 0) FROM LOTE_TAGGEADO WHERE epc_tag = %s", (epc_tag,))
+    lote_row = cur.fetchone()
+    total = float(lote_row[0] or 0) if lote_row else sum(item["quantidade_snapshot"] for item in products)
+    return products, total
+
+def _record_lote_movement(
+    cur,
+    epc_tag,
+    tipo_movimentacao,
+    camara_origem_id=None,
+    camara_destino_id=None,
+    sensor_id=None,
+    leitura_bruta_id=None,
+    posicao_vaga=None,
+    rssi=None,
+    origem_evento=None,
+):
+    """Grava uma movimentacao e o snapshot dos produtos para analise futura."""
+    _ensure_movement_history_schema(cur)
+    products, quantidade_total = _lote_product_snapshots(cur, epc_tag)
+    origem_ocupacao, origem_capacidade = _camera_occupancy_snapshot(cur, camara_origem_id)
+    destino_ocupacao, destino_capacidade = _camera_occupancy_snapshot(cur, camara_destino_id)
+
+    cur.execute(
+        "INSERT INTO MOVIMENTACAO_LOTE ("
+        "epc_tag, tipo_movimentacao, camara_origem_id, camara_destino_id, sensor_id, "
+        "leitura_bruta_id, posicao_vaga, quantidade_total_snapshot, "
+        "ocupacao_origem_snapshot, capacidade_origem_snapshot, "
+        "ocupacao_destino_snapshot, capacidade_destino_snapshot, rssi, origem_evento"
+        ") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+        "RETURNING id",
+        (
+            epc_tag,
+            tipo_movimentacao,
+            camara_origem_id,
+            camara_destino_id,
+            sensor_id,
+            leitura_bruta_id,
+            posicao_vaga,
+            quantidade_total,
+            origem_ocupacao,
+            origem_capacidade,
+            destino_ocupacao,
+            destino_capacidade,
+            rssi,
+            origem_evento,
+        )
+    )
+    movimentacao_id = cur.fetchone()[0]
+
+    for product in products:
+        cur.execute(
+            "INSERT INTO MOVIMENTACAO_LOTE_PRODUTO ("
+            "movimentacao_id, produto_tipo_id, produto_nome_snapshot, sku_snapshot, "
+            "unidade_medida_snapshot, quantidade_snapshot"
+            ") VALUES (%s, %s, %s, %s, %s, %s)",
+            (
+                movimentacao_id,
+                product["produto_tipo_id"],
+                product["produto_nome_snapshot"],
+                product["sku_snapshot"],
+                product["unidade_medida_snapshot"],
+                product["quantidade_snapshot"],
+            )
+        )
+
+    return movimentacao_id
+
 def _ensure_endereco_schema(cur):
     """Garante a tabela ENDERECO e o vinculo opcional em PREDIO.
 
@@ -881,6 +1039,7 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
 
         _ensure_lote_location_columns(cur)
         _ensure_leitura_bruta_movimentacao_column(cur)
+        _ensure_movement_history_schema(cur)
 
         # 1. Find associated camera
         cur.execute("SELECT camara_id FROM SENSOR WHERE id = %s", (sensor_id,))
@@ -913,15 +1072,19 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
         )
 
         cur.execute(
-            "SELECT camara_id, quantidade_atual FROM LOTE_TAGGEADO WHERE epc_tag = %s FOR UPDATE",
+            "SELECT camara_id, quantidade_atual, posicao_vaga FROM LOTE_TAGGEADO WHERE epc_tag = %s FOR UPDATE",
             (epc_tag,)
         )
         lote_row = cur.fetchone()
         current_camara_id = lote_row[0]
         quantidade_atual = lote_row[1]
+        current_posicao_vaga = lote_row[2]
         movimentacao = 'Saída' if current_camara_id == camara_id else 'Entrada'
 
         if current_camara_id == camara_id:
+            camara_origem_id = current_camara_id
+            camara_destino_id = None
+            movement_posicao_vaga = current_posicao_vaga
             cur.execute(
                 "UPDATE LOTE_TAGGEADO "
                 "SET camara_id = NULL, posicao_vaga = NULL, data_saida = NOW(), "
@@ -938,6 +1101,9 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
                 return False, "No available slots in camara"
 
             previous_camara_id = current_camara_id
+            camara_origem_id = previous_camara_id
+            camara_destino_id = camara_id
+            movement_posicao_vaga = pos_vaga
             cur.execute(
                 "UPDATE LOTE_TAGGEADO "
                 "SET camara_id = %s, posicao_vaga = %s, data_entrada = NOW(), data_saida = NULL, "
@@ -950,8 +1116,23 @@ def process_tag_event(epc_tag, sensor_id, event, rssi):
             _repack_lotes_na_camara(cur, camara_id)
 
         cur.execute(
-            "INSERT INTO LEITURA_BRUTA (epc_tag, sensor_id, rssi, movimentacao) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO LEITURA_BRUTA (epc_tag, sensor_id, rssi, movimentacao) "
+            "VALUES (%s, %s, %s, %s) RETURNING id",
             (epc_tag, sensor_id, rssi, movimentacao)
+        )
+        leitura_bruta_id = cur.fetchone()[0]
+
+        _record_lote_movement(
+            cur,
+            epc_tag=epc_tag,
+            tipo_movimentacao=movimentacao,
+            camara_origem_id=camara_origem_id,
+            camara_destino_id=camara_destino_id,
+            sensor_id=sensor_id,
+            leitura_bruta_id=leitura_bruta_id,
+            posicao_vaga=movement_posicao_vaga,
+            rssi=rssi,
+            origem_evento='RFID',
         )
 
         conn.commit()
@@ -1362,6 +1543,7 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
         open_camara = cur.fetchone()
         if open_camara and open_camara[0]:
             _repack_lotes_na_camara(cur, open_camara[0])
+        current_camara_id = open_camara[0] if open_camara else None
 
         cur.execute(
             "SELECT lp.produto_tipo_id, COALESCE(pt.nome, 'Produto sem nome'), lp.quantidade "
@@ -1371,6 +1553,15 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
             (epc_tag,)
         )
         produtos = cur.fetchall()
+
+        _record_lote_movement(
+            cur,
+            epc_tag=epc_tag,
+            tipo_movimentacao='Ajuste',
+            camara_origem_id=current_camara_id,
+            camara_destino_id=current_camara_id,
+            origem_evento='AJUSTE_LOTE',
+        )
 
         conn.commit()
         return {
@@ -1410,6 +1601,7 @@ def move_lote_to_camara(epc_tag, camara_id):
     cur = conn.cursor()
     try:
         _ensure_lote_location_columns(cur)
+        _ensure_movement_history_schema(cur)
 
         cur.execute("SELECT quantidade_atual, camara_id FROM LOTE_TAGGEADO WHERE epc_tag = %s FOR UPDATE", (epc_tag,))
         lote_row = cur.fetchone()
@@ -1440,6 +1632,16 @@ def move_lote_to_camara(epc_tag, camara_id):
         if origem_camara_id:
             _repack_lotes_na_camara(cur, origem_camara_id, strict=False)
         _repack_lotes_na_camara(cur, camara_id)
+
+        _record_lote_movement(
+            cur,
+            epc_tag=epc_tag,
+            tipo_movimentacao='Transferencia',
+            camara_origem_id=origem_camara_id,
+            camara_destino_id=camara_id,
+            posicao_vaga=pos_vaga,
+            origem_evento='MANUAL',
+        )
 
         conn.commit()
         return {

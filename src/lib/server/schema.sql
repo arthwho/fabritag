@@ -127,6 +127,45 @@ CREATE TABLE IF NOT EXISTS LEITURA_BRUTA (
 
 ALTER TABLE LEITURA_BRUTA ADD COLUMN IF NOT EXISTS movimentacao VARCHAR(20);
 
+-- Table 8.1: MOVIMENTACAO_LOTE (Historico analitico de movimentacoes)
+CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE (
+    id BIGSERIAL PRIMARY KEY,
+    epc_tag VARCHAR(50),
+    tipo_movimentacao VARCHAR(20) NOT NULL,
+    camara_origem_id INT REFERENCES CAMARA(id) ON DELETE SET NULL,
+    camara_destino_id INT REFERENCES CAMARA(id) ON DELETE SET NULL,
+    sensor_id INT REFERENCES SENSOR(id) ON DELETE SET NULL,
+    leitura_bruta_id BIGINT REFERENCES LEITURA_BRUTA(id) ON DELETE SET NULL,
+    posicao_vaga INT,
+    quantidade_total_snapshot FLOAT NOT NULL DEFAULT 0,
+    ocupacao_origem_snapshot INT,
+    capacidade_origem_snapshot INT,
+    ocupacao_destino_snapshot INT,
+    capacidade_destino_snapshot INT,
+    rssi INT,
+    origem_evento VARCHAR(30),
+    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_epc ON MOVIMENTACAO_LOTE(epc_tag);
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_data ON MOVIMENTACAO_LOTE(data_hora);
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_destino ON MOVIMENTACAO_LOTE(camara_destino_id, data_hora);
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_origem ON MOVIMENTACAO_LOTE(camara_origem_id, data_hora);
+
+-- Table 8.2: MOVIMENTACAO_LOTE_PRODUTO (Snapshot dos produtos por movimentacao)
+CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE_PRODUTO (
+    id BIGSERIAL PRIMARY KEY,
+    movimentacao_id BIGINT REFERENCES MOVIMENTACAO_LOTE(id) ON DELETE CASCADE,
+    produto_tipo_id INT REFERENCES PRODUTO_TIPO(id) ON DELETE SET NULL,
+    produto_nome_snapshot VARCHAR(100),
+    sku_snapshot VARCHAR(50),
+    unidade_medida_snapshot VARCHAR(20),
+    quantidade_snapshot FLOAT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_produto_mov ON MOVIMENTACAO_LOTE_PRODUTO(movimentacao_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacao_lote_produto_produto ON MOVIMENTACAO_LOTE_PRODUTO(produto_tipo_id, movimentacao_id);
+
 DROP TABLE IF EXISTS MOVIMENTACAO;
 
 -- Tabela 10 (novamente, listada como 10 na página 8 do PDF, mas é USUARIO)
