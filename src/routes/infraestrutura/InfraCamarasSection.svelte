@@ -15,7 +15,7 @@
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
 	type CamaraRow = {
-		id: number;
+		id: string;
 		nome: string;
 		predio: string;
 		capacidade_vagas: number | null;
@@ -33,8 +33,8 @@
 		filteredCamaras?: CamaraRow[];
 		searchTermCamaras?: string;
 		onOpenModal: () => void;
-		onEditCamara: (camaraId: number) => void | Promise<void>;
-		onDeleteCamara: (camaraId: number) => void | Promise<void>;
+		onEditCamara: (camaraId: string) => void | Promise<void>;
+		onDeleteCamara: (camaraId: string) => void | Promise<void>;
 	} = $props();
 </script>
 

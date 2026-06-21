@@ -18,16 +18,10 @@ const toStringValue = (value) => String(value ?? '').trim();
  * @returns {number|null} Inteiro positivo ou null quando vazio.
  * @throws {Error} Quando o valor não é inteiro positivo.
  */
-function parseOptionalPositiveInteger(rawValue) {
+function parseOptionalId(rawValue) {
     const value = toStringValue(rawValue);
     if (!value) return null;
-
-    const numberValue = Number(value);
-    if (!Number.isInteger(numberValue) || numberValue < 1) {
-        throw new Error('Informe um valor inteiro positivo.');
-    }
-
-    return numberValue;
+    return value;
 }
 
 /**
@@ -37,20 +31,20 @@ function parseOptionalPositiveInteger(rawValue) {
  * @param {string} errorMessage - Mensagem usada em caso de validação.
  * @returns {number} Inteiro positivo validado.
  */
-function parseRequiredPositiveInteger(rawValue, errorMessage) {
-    const numberValue = Number(rawValue);
-    if (!Number.isInteger(numberValue) || numberValue < 1) {
+function parseRequiredId(rawValue, errorMessage) {
+    const value = toStringValue(rawValue);
+    if (!value) {
         throw new Error(errorMessage);
     }
 
-    return numberValue;
+    return value;
 }
 
 /**
  * Converte o JSON de associação de produtos do lote.
  *
  * @param {unknown} rawValue - JSON serializado pelo formulário.
- * @returns {Array<{produto_tipo_id: number, quantidade: number}>} Associações normalizadas.
+ * @returns {Array<{produto_tipo_id: string, quantidade: number}>} Associações normalizadas.
  * @throws {Error} Quando o JSON, produto ou quantidade são inválidos.
  */
 function parseProdutoAssoc(rawValue) {
@@ -66,10 +60,10 @@ function parseProdutoAssoc(rawValue) {
     }
 
     return parsed.map((item) => {
-        const produtoTipoId = Number(item?.produto_tipo_id);
+        const produtoTipoId = toStringValue(item?.produto_tipo_id);
         const quantidade = Number(item?.quantidade);
 
-        if (!Number.isInteger(produtoTipoId) || produtoTipoId < 1) {
+        if (!produtoTipoId) {
             throw new Error('Produto associado inválido.');
         }
 
@@ -192,7 +186,7 @@ export const actions = {
 
         let clienteId = null;
         try {
-            clienteId = parseOptionalPositiveInteger(clienteIdRaw);
+            clienteId = parseOptionalId(clienteIdRaw);
         } catch {
             return fail(400, {
                 action: 'createProduto',
@@ -231,9 +225,9 @@ export const actions = {
         const unidadeMedida = toStringValue(formData.get('unidadeMedida'));
         const clienteIdRaw = formData.get('clienteId');
 
-        let produtoId = 0;
+        let produtoId = '';
         try {
-            produtoId = parseRequiredPositiveInteger(produtoIdRaw, 'Produto inválido para atualização.');
+            produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para atualização.');
         } catch (error) {
             return fail(400, {
                 action: 'updateProduto',
@@ -252,7 +246,7 @@ export const actions = {
 
         let clienteId = null;
         try {
-            clienteId = parseOptionalPositiveInteger(clienteIdRaw);
+            clienteId = parseOptionalId(clienteIdRaw);
         } catch {
             return fail(400, {
                 action: 'updateProduto',
@@ -287,9 +281,9 @@ export const actions = {
         const formData = await request.formData();
         const produtoIdRaw = formData.get('produtoId');
 
-        let produtoId = 0;
+        let produtoId = '';
         try {
-            produtoId = parseRequiredPositiveInteger(produtoIdRaw, 'Produto inválido para exclusão.');
+            produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para exclusão.');
         } catch (error) {
             return fail(400, {
                 action: 'deleteProduto',
@@ -370,9 +364,9 @@ export const actions = {
             });
         }
 
-        let camaraId = 0;
+        let camaraId = '';
         try {
-            camaraId = parseRequiredPositiveInteger(camaraIdRaw, 'Selecione uma câmara de destino válida.');
+            camaraId = parseRequiredId(camaraIdRaw, 'Selecione uma câmara de destino válida.');
         } catch (error) {
             return fail(400, {
                 action: 'moveLote',

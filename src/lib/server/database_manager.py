@@ -3,6 +3,7 @@ import math
 import psycopg2
 from psycopg2 import pool
 from dotenv import load_dotenv
+from uuid import UUID
 
 load_dotenv()
 
@@ -25,6 +26,13 @@ try:
 except Exception as e:
     print(f"Error creating connection pool: {e}")
     db_pool = None
+
+def _normalize_uuid_id(value, field_name="id"):
+    """Normaliza um identificador UUID recebido da API."""
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError(f"Invalid field: {field_name}")
 
 def get_db_connection():
     """Retorna uma conexão disponível do pool PostgreSQL.
@@ -126,7 +134,7 @@ def _ensure_lote_produto_assoc_table(cur):
     cur.execute(
         "CREATE TABLE IF NOT EXISTS LOTE_PRODUTO_ASSOC ("
         "epc_tag VARCHAR(50) REFERENCES LOTE_TAGGEADO(epc_tag) ON DELETE CASCADE, "
-        "produto_tipo_id INT REFERENCES PRODUTO_TIPO(id), "
+        "produto_tipo_id UUID REFERENCES PRODUTO_TIPO(id), "
         "quantidade FLOAT NOT NULL DEFAULT 1, "
         "PRIMARY KEY (epc_tag, produto_tipo_id)"
         ")"
@@ -142,7 +150,7 @@ def _ensure_lote_location_columns(cur):
     Mantém o backend compatível com bancos já criados antes da remoção da
     tabela MOVIMENTACAO.
     """
-    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS camara_id INT REFERENCES CAMARA(id)")
+    cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS camara_id UUID REFERENCES CAMARA(id)")
     cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS posicao_vaga INT")
     cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_entrada TIMESTAMP")
     cur.execute("ALTER TABLE LOTE_TAGGEADO ADD COLUMN IF NOT EXISTS data_saida TIMESTAMP")
@@ -183,13 +191,13 @@ def _ensure_movement_history_schema(cur):
     """Garante tabelas append-only para historico analitico de movimentacoes."""
     cur.execute(
         "CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE ("
-        "id BIGSERIAL PRIMARY KEY, "
+        "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
         "epc_tag VARCHAR(50), "
         "tipo_movimentacao VARCHAR(20) NOT NULL, "
-        "camara_origem_id INT REFERENCES CAMARA(id) ON DELETE SET NULL, "
-        "camara_destino_id INT REFERENCES CAMARA(id) ON DELETE SET NULL, "
-        "sensor_id INT REFERENCES SENSOR(id) ON DELETE SET NULL, "
-        "leitura_bruta_id BIGINT REFERENCES LEITURA_BRUTA(id) ON DELETE SET NULL, "
+        "camara_origem_id UUID REFERENCES CAMARA(id) ON DELETE SET NULL, "
+        "camara_destino_id UUID REFERENCES CAMARA(id) ON DELETE SET NULL, "
+        "sensor_id UUID REFERENCES SENSOR(id) ON DELETE SET NULL, "
+        "leitura_bruta_id UUID REFERENCES LEITURA_BRUTA(id) ON DELETE SET NULL, "
         "posicao_vaga INT, "
         "quantidade_total_snapshot FLOAT NOT NULL DEFAULT 0, "
         "ocupacao_origem_snapshot INT, "
@@ -203,9 +211,9 @@ def _ensure_movement_history_schema(cur):
     )
     cur.execute(
         "CREATE TABLE IF NOT EXISTS MOVIMENTACAO_LOTE_PRODUTO ("
-        "id BIGSERIAL PRIMARY KEY, "
-        "movimentacao_id BIGINT REFERENCES MOVIMENTACAO_LOTE(id) ON DELETE CASCADE, "
-        "produto_tipo_id INT REFERENCES PRODUTO_TIPO(id) ON DELETE SET NULL, "
+        "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
+        "movimentacao_id UUID REFERENCES MOVIMENTACAO_LOTE(id) ON DELETE CASCADE, "
+        "produto_tipo_id UUID REFERENCES PRODUTO_TIPO(id) ON DELETE SET NULL, "
         "produto_nome_snapshot VARCHAR(100), "
         "sku_snapshot VARCHAR(50), "
         "unidade_medida_snapshot VARCHAR(20), "
@@ -346,7 +354,7 @@ def _ensure_endereco_schema(cur):
     """
     cur.execute(
         "CREATE TABLE IF NOT EXISTS ENDERECO ("
-        "id SERIAL PRIMARY KEY, "
+        "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), "
         "cep VARCHAR(9), "
         "logradouro VARCHAR(150), "
         "numero VARCHAR(20), "
@@ -356,7 +364,7 @@ def _ensure_endereco_schema(cur):
         "estado VARCHAR(100)"
         ")"
     )
-    cur.execute("ALTER TABLE PREDIO ADD COLUMN IF NOT EXISTS endereco_id INT REFERENCES ENDERECO(id)")
+    cur.execute("ALTER TABLE PREDIO ADD COLUMN IF NOT EXISTS endereco_id UUID REFERENCES ENDERECO(id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_predio_endereco ON PREDIO(endereco_id)")
 
 def _normalize_endereco_data(endereco_data=None, endereco=None):
@@ -461,7 +469,7 @@ def fetch_batch():
         cur.execute(
             "SELECT l.epc_tag, l.produto_tipo_id, l.quantidade_atual, l.status, "
             "COALESCE(c_atual.nome, 'Desconhecido'), l.data_entrada, "
-            "COALESCE(prod_assoc.produto_ids, CASE WHEN l.produto_tipo_id IS NOT NULL THEN ARRAY[l.produto_tipo_id]::INT[] ELSE ARRAY[]::INT[] END), "
+            "COALESCE(prod_assoc.produto_ids, CASE WHEN l.produto_tipo_id IS NOT NULL THEN ARRAY[l.produto_tipo_id]::UUID[] ELSE ARRAY[]::UUID[] END), "
             "COALESCE(prod_assoc.produto_nomes, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[pt_legacy.nome]::TEXT[] ELSE ARRAY[]::TEXT[] END), "
             "COALESCE(prod_assoc.produto_quantidades, CASE WHEN pt_legacy.nome IS NOT NULL THEN ARRAY[COALESCE(l.quantidade_atual, 1)]::FLOAT[] ELSE ARRAY[]::FLOAT[] END), "
             "COALESCE(prod_assoc.quantidade_total, COALESCE(l.quantidade_atual, 0)) "
@@ -1496,11 +1504,9 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
 
         normalized_assoc = {}
         for item in produto_assoc:
-            produto_id = int(item.get('produto_tipo_id'))
+            produto_id = _normalize_uuid_id(item.get('produto_tipo_id'), "produto_tipo_id")
             quantidade = float(item.get('quantidade'))
 
-            if produto_id <= 0:
-                raise ValueError("Produto not found")
             if quantidade <= 0:
                 raise ValueError("Invalid quantidade for produto")
 
@@ -1508,9 +1514,9 @@ def update_lote_taggeado(epc_tag, produto_assoc=None):
 
         produto_tipo_ids = sorted(normalized_assoc.keys())
 
-        cur.execute("SELECT id, unidade_medida FROM PRODUTO_TIPO WHERE id = ANY(%s)", (produto_tipo_ids,))
+        cur.execute("SELECT id, unidade_medida FROM PRODUTO_TIPO WHERE id = ANY(%s::uuid[])", (produto_tipo_ids,))
         produto_rows = cur.fetchall()
-        found_ids = {row[0] for row in produto_rows}
+        found_ids = {str(row[0]) for row in produto_rows}
         if len(found_ids) != len(produto_tipo_ids):
             raise ValueError("Produto not found")
 

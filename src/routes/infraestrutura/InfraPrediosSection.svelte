@@ -14,7 +14,7 @@
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
 	type PredioRow = {
-		id: number;
+		id: string;
 		nome: string;
 		endereco: string;
 		total_camaras: number;
@@ -30,8 +30,8 @@
 		filteredPredios?: PredioRow[];
 		searchTermPredios?: string;
 		onOpenModal: () => void;
-		onEditPredio: (predioId: number) => void | Promise<void>;
-		onDeletePredio: (predioId: number) => void | Promise<void>;
+		onEditPredio: (predioId: string) => void | Promise<void>;
+		onDeletePredio: (predioId: string) => void | Promise<void>;
 	} = $props();
 </script>
 

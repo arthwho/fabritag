@@ -17,13 +17,13 @@ const toStringValue = (value) => String(value ?? '').trim();
  * @param {string} errorMessage - Mensagem para valor inválido.
  * @returns {number} Inteiro positivo.
  */
-function parseRequiredPositiveInteger(rawValue, errorMessage) {
-	const numberValue = Number(rawValue);
-	if (!Number.isInteger(numberValue) || numberValue <= 0) {
+function parseRequiredId(rawValue, errorMessage) {
+	const value = toStringValue(rawValue);
+	if (!value) {
 		throw new Error(errorMessage);
 	}
 
-	return numberValue;
+	return value;
 }
 
 /**
@@ -208,9 +208,9 @@ export const actions = {
 		const endereco = formatEndereco(enderecoFields);
 		const fieldValues = getPredioFieldValues(nome, enderecoFields);
 
-		let predioId = 0;
+		let predioId = '';
 		try {
-			predioId = parseRequiredPositiveInteger(predioIdRaw, 'Prédio inválido para atualização.');
+			predioId = parseRequiredId(predioIdRaw, 'Prédio inválido para atualização.');
 		} catch (error) {
 			return fail(400, {
 				action: 'updatePredio',
@@ -252,9 +252,9 @@ export const actions = {
 		const formData = await request.formData();
 		const predioIdRaw = formData.get('predioId');
 
-		let predioId = 0;
+		let predioId = '';
 		try {
-			predioId = parseRequiredPositiveInteger(predioIdRaw, 'Prédio inválido para exclusão.');
+			predioId = parseRequiredId(predioIdRaw, 'Prédio inválido para exclusão.');
 		} catch (error) {
 			return fail(400, {
 				action: 'deletePredio',
@@ -282,9 +282,9 @@ export const actions = {
 		const camaraNome = toStringValue(formData.get('camaraNome'));
 		const camaraCapacidadeRaw = formData.get('camaraCapacidade');
 
-		let predioId = 0;
+		let predioId = '';
 		try {
-			predioId = parseRequiredPositiveInteger(
+			predioId = parseRequiredId(
 				camaraPredioIdRaw,
 				'Selecione um prédio válido para a câmara.'
 			);
@@ -362,11 +362,11 @@ export const actions = {
 		const camaraNome = toStringValue(formData.get('camaraNome'));
 		const camaraCapacidadeRaw = formData.get('camaraCapacidade');
 
-		let camaraId = 0;
-		let predioId = 0;
+		let camaraId = '';
+		let predioId = '';
 		try {
-			camaraId = parseRequiredPositiveInteger(camaraIdRaw, 'Câmara inválida para atualização.');
-			predioId = parseRequiredPositiveInteger(
+			camaraId = parseRequiredId(camaraIdRaw, 'Câmara inválida para atualização.');
+			predioId = parseRequiredId(
 				camaraPredioIdRaw,
 				'Selecione um prédio válido para a câmara.'
 			);
@@ -441,9 +441,9 @@ export const actions = {
 		const formData = await request.formData();
 		const camaraIdRaw = formData.get('camaraId');
 
-		let camaraId = 0;
+		let camaraId = '';
 		try {
-			camaraId = parseRequiredPositiveInteger(camaraIdRaw, 'Câmara inválida para exclusão.');
+			camaraId = parseRequiredId(camaraIdRaw, 'Câmara inválida para exclusão.');
 		} catch (error) {
 			return fail(400, {
 				action: 'deleteCamara',
@@ -471,9 +471,9 @@ export const actions = {
 		const sensorModelo = toStringValue(formData.get('sensorModelo')) || 'PN5180';
 		const sensorAtivo = parseBooleanFromFormData(formData.get('sensorAtivo'));
 
-		let camaraId = 0;
+		let camaraId = '';
 		try {
-			camaraId = parseRequiredPositiveInteger(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
+			camaraId = parseRequiredId(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
 		} catch (error) {
 			return fail(400, {
 				action: 'createSensor',
@@ -518,11 +518,11 @@ export const actions = {
 		const sensorModelo = toStringValue(formData.get('sensorModelo')) || 'PN5180';
 		const sensorAtivo = parseBooleanFromFormData(formData.get('sensorAtivo'));
 
-		let sensorId = 0;
-		let camaraId = 0;
+		let sensorId = '';
+		let camaraId = '';
 		try {
-			sensorId = parseRequiredPositiveInteger(sensorIdRaw, 'Sensor inválido para atualização.');
-			camaraId = parseRequiredPositiveInteger(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
+			sensorId = parseRequiredId(sensorIdRaw, 'Sensor inválido para atualização.');
+			camaraId = parseRequiredId(sensorCamaraIdRaw, 'Selecione a câmara do sensor.');
 		} catch (error) {
 			return fail(400, {
 				action: 'updateSensor',
@@ -564,9 +564,9 @@ export const actions = {
 		const formData = await request.formData();
 		const sensorIdRaw = formData.get('sensorId');
 
-		let sensorId = 0;
+		let sensorId = '';
 		try {
-			sensorId = parseRequiredPositiveInteger(sensorIdRaw, 'Sensor inválido para exclusão.');
+			sensorId = parseRequiredId(sensorIdRaw, 'Sensor inválido para exclusão.');
 		} catch (error) {
 			return fail(400, {
 				action: 'deleteSensor',

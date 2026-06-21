@@ -33,16 +33,20 @@ function toStringValue(value) {
  * @param {unknown} rawValue - Valor bruto do formulário.
  * @returns {number|null} Inteiro positivo ou null quando vazio.
  */
-function parseOptionalPositiveInteger(rawValue) {
+function parseOptionalId(rawValue) {
     const value = toStringValue(rawValue);
     if (!value) return null;
 
-    const numberValue = Number(value);
-    if (!Number.isInteger(numberValue) || numberValue < 1) {
-        throw new Error('Informe um cliente válido.');
+    return value;
+}
+
+function parseRequiredId(rawValue, errorMessage) {
+    const value = toStringValue(rawValue);
+    if (!value) {
+        throw new Error(errorMessage);
     }
 
-    return numberValue;
+    return value;
 }
 
 /**
@@ -270,7 +274,7 @@ export const actions = {
 
         let clienteId = null;
         try {
-            clienteId = parseOptionalPositiveInteger(clienteIdRaw);
+            clienteId = parseOptionalId(clienteIdRaw);
         } catch (error) {
             return fail(400, {
                 action: 'create',
@@ -318,7 +322,7 @@ export const actions = {
         const token = getAuthToken(event);
         const formData = await event.request.formData();
 
-        const usuarioId = Number(formData.get('usuarioId'));
+        const usuarioIdRaw = formData.get('usuarioId');
         const email = toStringValue(formData.get('email')).toLowerCase();
         const nomeCompleto = toStringValue(formData.get('nomeCompleto'));
         const password = toStringValue(formData.get('password'));
@@ -326,7 +330,10 @@ export const actions = {
         const cpfCnpjRaw = toStringValue(formData.get('cpfCnpj'));
         const clienteIdRaw = formData.get('clienteId');
 
-        if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        let usuarioId = '';
+        try {
+            usuarioId = parseRequiredId(usuarioIdRaw, 'Usuário inválido para atualização.');
+        } catch {
             return fail(400, {
                 action: 'update',
                 error: 'Usuário inválido para atualização.',
@@ -373,7 +380,7 @@ export const actions = {
 
         let clienteId = null;
         try {
-            clienteId = parseOptionalPositiveInteger(clienteIdRaw);
+            clienteId = parseOptionalId(clienteIdRaw);
         } catch (error) {
             return fail(400, {
                 action: 'update',
@@ -425,9 +432,12 @@ export const actions = {
     delete: async (event) => {
         const token = getAuthToken(event);
         const formData = await event.request.formData();
-        const usuarioId = Number(formData.get('usuarioId'));
+        const usuarioIdRaw = formData.get('usuarioId');
 
-        if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        let usuarioId = '';
+        try {
+            usuarioId = parseRequiredId(usuarioIdRaw, 'Usuário inválido para exclusão.');
+        } catch {
             return fail(400, {
                 action: 'delete',
                 error: 'Usuário inválido para exclusão.'

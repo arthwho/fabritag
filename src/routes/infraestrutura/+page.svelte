@@ -66,9 +66,9 @@
 	let isPredioModalOpen = $state(false);
 	let isCamaraModalOpen = $state(false);
 	let isSensorModalOpen = $state(false);
-	let editingPredioId = $state<number | null>(null);
-	let editingCamaraId = $state<number | null>(null);
-	let editingSensorId = $state<number | null>(null);
+	let editingPredioId = $state<string | null>(null);
+	let editingCamaraId = $state<string | null>(null);
+	let editingSensorId = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let formError = $state('');
 
@@ -89,9 +89,9 @@
 	let sensorCamaraId = $state('');
 	let sensorModelo = $state('PN5180');
 	let sensorAtivo = $state(true);
-	let deletePredioForms = $state<Record<number, HTMLFormElement | undefined>>({});
-	let deleteCamaraForms = $state<Record<number, HTMLFormElement | undefined>>({});
-	let deleteSensorForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deletePredioForms = $state<Record<string, HTMLFormElement | undefined>>({});
+	let deleteCamaraForms = $state<Record<string, HTMLFormElement | undefined>>({});
+	let deleteSensorForms = $state<Record<string, HTMLFormElement | undefined>>({});
 
 	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
@@ -157,7 +157,7 @@
 	});
 
 	/** Preenche e abre o modal de edição do prédio selecionado. */
-	function handleEditPredio(predioId: number) {
+	function handleEditPredio(predioId: string) {
 		const predio = infraestrutura?.lista_predios?.find((item) => item.id === predioId);
 		if (!predio) return;
 
@@ -176,13 +176,13 @@
 	}
 
 	/** Confirma e envia a exclusão do prédio selecionado. */
-	function handleDeletePredio(predioId: number) {
+	function handleDeletePredio(predioId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir este prédio?')) return;
 		deletePredioForms[predioId]?.requestSubmit();
 	}
 
 	/** Preenche e abre o modal de edição da câmara selecionada. */
-	function handleEditCamara(camaraId: number) {
+	function handleEditCamara(camaraId: string) {
 		const camara = infraestrutura?.lista_camaras?.find((item) => item.id === camaraId);
 		if (!camara) return;
 
@@ -195,13 +195,13 @@
 	}
 
 	/** Confirma e envia a exclusão da câmara selecionada. */
-	function handleDeleteCamara(camaraId: number) {
+	function handleDeleteCamara(camaraId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir esta câmara?')) return;
 		deleteCamaraForms[camaraId]?.requestSubmit();
 	}
 
 	/** Preenche e abre o modal de edição do sensor selecionado. */
-	function handleEdit(sensorId: number) {
+	function handleEdit(sensorId: string) {
 		const sensor = infraestrutura?.lista_sensores?.find((item) => item.id === sensorId);
 		if (!sensor) return;
 
@@ -214,7 +214,7 @@
 	}
 
 	/** Confirma e envia a exclusão do sensor selecionado. */
-	function handleDeleteSensor(sensorId: number) {
+	function handleDeleteSensor(sensorId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir este sensor?')) return;
 		deleteSensorForms[sensorId]?.requestSubmit();
 	}

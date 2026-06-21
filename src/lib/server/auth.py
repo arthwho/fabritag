@@ -8,6 +8,7 @@ from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from flask import Blueprint, jsonify, request
 
@@ -100,6 +101,20 @@ def _build_user_payload(row):
         'cliente_id': row[4],
         'cliente_nome': row[5],
     }
+
+
+def _normalize_uuid_id(value, field_name='id'):
+    """Normaliza um identificador UUID recebido pela API."""
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError(f'Invalid field: {field_name}')
+
+
+def _normalize_optional_uuid_id(value, field_name='id'):
+    if value in ('', None):
+        return None
+    return _normalize_uuid_id(value, field_name)
 
 
 def _extract_token():
@@ -293,7 +308,7 @@ def _create_session_for_user(user_id, email):
     expires_at = _utcnow() + timedelta(hours=_SESSION_DURATION_HOURS)
     with _SESSION_LOCK:
         _ACTIVE_SESSIONS[token] = {
-            'user_id': user_id,
+            'user_id': str(user_id),
             'email': email,
             'expires_at': expires_at,
         }
@@ -655,11 +670,8 @@ def create_usuario():
         return jsonify({'error': str(error_message)}), 400
 
     try:
-        if cliente_id is not None:
-            cliente_id = int(cliente_id)
-            if cliente_id <= 0:
-                raise ValueError('Invalid field: cliente_id')
-    except (TypeError, ValueError):
+        cliente_id = _normalize_optional_uuid_id(cliente_id, 'cliente_id')
+    except ValueError:
         return jsonify({'error': 'Invalid field: cliente_id'}), 400
 
     if create_cliente and cliente_id is not None:
@@ -697,7 +709,7 @@ def create_usuario():
         db.release_db_connection(conn)
 
 
-@auth_bp.route('/api/usuarios/<int:usuario_id>', methods=['PUT'])
+@auth_bp.route('/api/usuarios/<string:usuario_id>', methods=['PUT'])
 def update_usuario(usuario_id):
     """Atualiza um usuário existente.
 
@@ -710,6 +722,11 @@ def update_usuario(usuario_id):
     session_user, error = _current_session_user(require_auth=True)
     if error:
         return error
+
+    try:
+        usuario_id = _normalize_uuid_id(usuario_id, 'usuario_id')
+    except ValueError:
+        return jsonify({'error': 'Invalid field: usuario_id'}), 400
 
     payload = request.json or {}
     nome_completo = str(payload.get('nome_completo') or '').strip()
@@ -725,14 +742,10 @@ def update_usuario(usuario_id):
     if not email:
         return jsonify({'error': 'Missing required field: email'}), 400
 
-    cliente_id = None
-    if cliente_id_raw not in ('', None):
-        try:
-            cliente_id = int(cliente_id_raw)
-            if cliente_id <= 0:
-                raise ValueError('Invalid field: cliente_id')
-        except (TypeError, ValueError):
-            return jsonify({'error': 'Invalid field: cliente_id'}), 400
+    try:
+        cliente_id = _normalize_optional_uuid_id(cliente_id_raw, 'cliente_id')
+    except ValueError:
+        return jsonify({'error': 'Invalid field: cliente_id'}), 400
 
     if create_cliente and cliente_id is not None:
         return jsonify({'error': 'Não é permitido criar cliente quando já existe cliente associado.'}), 400
@@ -794,7 +807,7 @@ def update_usuario(usuario_id):
         db.release_db_connection(conn)
 
 
-@auth_bp.route('/api/usuarios/<int:usuario_id>', methods=['DELETE'])
+@auth_bp.route('/api/usuarios/<string:usuario_id>', methods=['DELETE'])
 def delete_usuario(usuario_id):
     """Exclui um usuário diferente do usuário logado.
 
@@ -806,6 +819,11 @@ def delete_usuario(usuario_id):
     session_user, error = _current_session_user(require_auth=True)
     if error:
         return error
+
+    try:
+        usuario_id = _normalize_uuid_id(usuario_id, 'usuario_id')
+    except ValueError:
+        return jsonify({'error': 'Invalid field: usuario_id'}), 400
 
     if session_user['user_id'] == usuario_id:
         return jsonify({'error': 'Cannot delete the current logged user'}), 409
@@ -859,11 +877,8 @@ def register_usuario():
         return jsonify({'error': str(error_message)}), 400
 
     try:
-        if cliente_id is not None:
-            cliente_id = int(cliente_id)
-            if cliente_id <= 0:
-                raise ValueError('Invalid field: cliente_id')
-    except (TypeError, ValueError):
+        cliente_id = _normalize_optional_uuid_id(cliente_id, 'cliente_id')
+    except ValueError:
         return jsonify({'error': 'Invalid field: cliente_id'}), 400
 
     if create_cliente and cliente_id is not None:

@@ -25,8 +25,8 @@
 	let { data, form } = $props();
 
 	type ProdutoRow = {
-		id: number;
-		cliente_id: number | null;
+		id: string;
+		cliente_id: string | null;
 		cliente_nome?: string;
 		nome: string;
 		sku: string | null;
@@ -35,25 +35,25 @@
 	};
 
 	type ClienteOption = {
-		id: number;
+		id: string;
 		nome: string;
 		cpf_cnpj?: string | null;
 	};
 
 	type CamaraOption = {
-		id: number;
+		id: string;
 		nome: string;
 	};
 
 	type LoteRow = {
 		id?: string;
 		epc_tag: string;
-		produto_tipo_id: number | null;
-		produto_tipo_ids?: number[];
+		produto_tipo_id: string | null;
+		produto_tipo_ids?: string[];
 		produto_nome: string | null;
 		produto_nomes?: string[];
 		produto_assoc?: Array<{
-			produto_tipo_id: number;
+			produto_tipo_id: string;
 			produto_nome: string;
 			quantidade: number;
 		}>;
@@ -88,7 +88,7 @@
 	let isProdutoModalOpen = $state(false);
 	let isLoteModalOpen = $state(false);
 	let isMoveLoteModalOpen = $state(false);
-	let editingProdutoId = $state<number | null>(null);
+	let editingProdutoId = $state<string | null>(null);
 	let editingLoteEpcTag = $state('');
 	let movingLoteEpcTag = $state('');
 	let moveDestinoCamaraId = $state('');
@@ -101,7 +101,7 @@
 	let loteProdutoTipoIds = $state<string[]>([]);
 	let loteProdutoSearch = $state('');
 	let loteQuantidades = $state<Record<string, string>>({});
-	let deleteProdutoForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deleteProdutoForms = $state<Record<string, HTMLFormElement | undefined>>({});
 
 	let actionResult = $derived((form || null) as ActionResultPayload | null);
 
@@ -187,7 +187,7 @@
 	}
 
 	/** Preenche o modal com dados do produto selecionado para edição. */
-	function handleEditProduto(produtoId: number) {
+	function handleEditProduto(produtoId: string) {
 		const produto = produtos.find((item) => item.id === produtoId);
 		if (!produto) return;
 
@@ -201,7 +201,7 @@
 	}
 
 	/** Confirma e envia a exclusão do produto selecionado. */
-	function handleDeleteProduto(produtoId: number) {
+	function handleDeleteProduto(produtoId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir este produto?')) return;
 
 		deleteProdutoForms[produtoId]?.requestSubmit();
@@ -287,7 +287,7 @@
 	/** Serializa produtos selecionados e quantidades para envio ao action server-side. */
 	function buildProdutoAssocJson() {
 		const produtoAssoc = loteProdutoTipoIds.map((idValue) => ({
-			produto_tipo_id: Number(idValue),
+			produto_tipo_id: idValue,
 			quantidade: Number(loteQuantidades[idValue])
 		}));
 

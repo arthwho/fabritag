@@ -23,7 +23,7 @@
 	let { data, form } = $props();
 
 	type ClienteRow = {
-		id: number;
+		id: string;
 		nome?: string | null;
 		nome_razao_social?: string | null;
 		cpf_cnpj?: string | null;
@@ -32,12 +32,12 @@
 	let clientes = $derived((data.clientes || []) as ClienteRow[]);
 	let searchClientes = $state('');
 	let isClienteModalOpen = $state(false);
-	let editingClienteId = $state<number | null>(null);
+	let editingClienteId = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let formError = $state('');
 	let clienteNome = $state('');
 	let clienteCpfCnpj = $state('');
-	let deleteForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deleteForms = $state<Record<string, HTMLFormElement | undefined>>({});
 
 	type ActionResultPayload = {
 		action?: 'create' | 'update' | 'delete';
@@ -121,7 +121,7 @@
 	}
 
 	/** Preenche o formulário com os dados do cliente selecionado para edição. */
-	function handleEditCliente(clienteId: number) {
+	function handleEditCliente(clienteId: string) {
 		const cliente = clientes.find((item) => item.id === clienteId);
 		if (!cliente) return;
 
@@ -133,7 +133,7 @@
 	}
 
 	/** Confirma e envia a exclusão do cliente selecionado. */
-	function handleDeleteCliente(clienteId: number) {
+	function handleDeleteCliente(clienteId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
 
 		deleteForms[clienteId]?.requestSubmit();

@@ -16,12 +16,12 @@
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
 
 	type SensorRow = {
-		id: number;
+		id: string;
 		modelo: string;
 		camara: string;
-		camara_id: number;
+		camara_id: string;
 		dispositivo: string;
-		dispositivo_id: number | null;
+		dispositivo_id: string | null;
 		status: string;
 		ativo: boolean;
 	};
@@ -36,8 +36,8 @@
 		filteredItems?: SensorRow[];
 		searchTerm?: string;
 		onOpenModal: () => void;
-		onEditSensor: (sensorId: number) => void | Promise<void>;
-		onDeleteSensor: (sensorId: number) => void | Promise<void>;
+		onEditSensor: (sensorId: string) => void | Promise<void>;
+		onDeleteSensor: (sensorId: string) => void | Promise<void>;
 	} = $props();
 </script>
 

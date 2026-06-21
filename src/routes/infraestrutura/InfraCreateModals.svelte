@@ -5,12 +5,12 @@
 	import { Modal, Input, Label, Select, Button } from '$lib/uicomponents.js';
 
 	type PredioOption = {
-		id: number;
+		id: string;
 		nome: string;
 	};
 
 	type CamaraOption = {
-		id: number;
+		id: string;
 		nome: string;
 	};
 
@@ -87,9 +87,9 @@
 		onEnhancePredio: SubmitFunction;
 		onEnhanceCamara: SubmitFunction;
 		onEnhanceSensor: SubmitFunction;
-		editingPredioId?: number | null;
-		editingCamaraId?: number | null;
-		editingSensorId?: number | null;
+		editingPredioId?: string | null;
+		editingCamaraId?: string | null;
+		editingSensorId?: string | null;
 	} = $props();
 
 	let consultaCepAtiva = $state(true);

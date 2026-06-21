@@ -2,10 +2,25 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import database_manager as db
 from auth import auth_bp, init_auth_schema
+from uuid import UUID
 
 app = Flask(__name__)
 CORS(app)
 app.register_blueprint(auth_bp)
+
+
+def normalize_uuid_id(value, field_name):
+    """Normaliza identificadores UUID recebidos em rotas ou payloads."""
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError(f"Invalid field: {field_name}")
+
+
+def normalize_optional_uuid_id(value, field_name):
+    if value in ('', None):
+        return None
+    return normalize_uuid_id(value, field_name)
 
 
 def value_error_status(message):
@@ -91,18 +106,19 @@ def create_cliente():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/clientes/<int:cliente_id>', methods=['PUT'])
+@app.route('/api/clientes/<string:cliente_id>', methods=['PUT'])
 def update_cliente(cliente_id):
     """Atualiza um cliente pelo id da rota.
 
     Parâmetros:
         cliente_id: identificador do cliente no caminho da URL.
     """
-    data = request.json or {}
-    cpf_cnpj = data.get('cpf_cnpj')
-    nome_razao_social = data.get('nome_razao_social')
-
     try:
+        cliente_id = normalize_uuid_id(cliente_id, 'cliente_id')
+        data = request.json or {}
+        cpf_cnpj = data.get('cpf_cnpj')
+        nome_razao_social = data.get('nome_razao_social')
+
         cliente = db.update_cliente(
             cliente_id=cliente_id,
             cpf_cnpj=cpf_cnpj,
@@ -115,7 +131,7 @@ def update_cliente(cliente_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/clientes/<int:cliente_id>', methods=['DELETE'])
+@app.route('/api/clientes/<string:cliente_id>', methods=['DELETE'])
 def delete_cliente(cliente_id):
     """Exclui um cliente pelo id da rota.
 
@@ -123,6 +139,7 @@ def delete_cliente(cliente_id):
         cliente_id: identificador do cliente no caminho da URL.
     """
     try:
+        cliente_id = normalize_uuid_id(cliente_id, 'cliente_id')
         result = db.delete_cliente(cliente_id=cliente_id)
         return jsonify(result), 200
     except ValueError as e:
@@ -144,13 +161,11 @@ def create_produto():
     sku = data.get('sku')
     unidade_medida = data.get('unidade_medida')
 
-    if cliente_id in ('', None):
-        cliente_id = None
-
     if not nome:
         return jsonify({"error": "Missing required field: nome"}), 400
 
     try:
+        cliente_id = normalize_optional_uuid_id(cliente_id, 'cliente_id')
         produto = db.create_produto_tipo(
             cliente_id=cliente_id,
             nome=nome,
@@ -164,7 +179,7 @@ def create_produto():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/produtos/<int:produto_id>', methods=['PUT'])
+@app.route('/api/produtos/<string:produto_id>', methods=['PUT'])
 def update_produto(produto_id):
     """Atualiza um tipo de produto existente.
 
@@ -179,13 +194,12 @@ def update_produto(produto_id):
     sku = data.get('sku')
     unidade_medida = data.get('unidade_medida')
 
-    if cliente_id in ('', None):
-        cliente_id = None
-
     if not nome:
         return jsonify({"error": "Missing required field: nome"}), 400
 
     try:
+        produto_id = normalize_uuid_id(produto_id, 'produto_id')
+        cliente_id = normalize_optional_uuid_id(cliente_id, 'cliente_id')
         produto = db.update_produto_tipo(
             produto_id=produto_id,
             cliente_id=cliente_id,
@@ -200,7 +214,7 @@ def update_produto(produto_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/produtos/<int:produto_id>', methods=['DELETE'])
+@app.route('/api/produtos/<string:produto_id>', methods=['DELETE'])
 def delete_produto(produto_id):
     """Exclui um tipo de produto.
 
@@ -208,6 +222,7 @@ def delete_produto(produto_id):
         produto_id: id do produto recebido na rota.
     """
     try:
+        produto_id = normalize_uuid_id(produto_id, 'produto_id')
         result = db.delete_produto_tipo(produto_id=produto_id)
         return jsonify(result), 200
     except ValueError as e:
@@ -266,8 +281,11 @@ def update_lote(epc_tag):
             return jsonify({"error": "Invalid field: quantidade_atual"}), 400
 
         try:
-            produto_tipo_ids = [int(produto_id) for produto_id in produto_tipo_ids]
-        except (TypeError, ValueError):
+            produto_tipo_ids = [
+                normalize_uuid_id(produto_id, 'produto_tipo_ids')
+                for produto_id in produto_tipo_ids
+            ]
+        except ValueError:
             return jsonify({"error": "Invalid field: produto_tipo_ids"}), 400
 
         produto_assoc = [
@@ -308,11 +326,8 @@ def move_lote(epc_tag):
         return jsonify({"error": "Missing required field: camara_id"}), 400
 
     try:
-        camara_id = int(camara_id)
-    except (TypeError, ValueError):
-        return jsonify({"error": "Invalid field: camara_id"}), 400
-
-    if camara_id <= 0:
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
+    except ValueError:
         return jsonify({"error": "Invalid field: camara_id"}), 400
 
     try:
@@ -356,7 +371,7 @@ def create_predio():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/predios/<int:predio_id>', methods=['PUT'])
+@app.route('/api/predios/<string:predio_id>', methods=['PUT'])
 def update_predio(predio_id):
     """Atualiza um prédio.
 
@@ -372,6 +387,7 @@ def update_predio(predio_id):
         return jsonify({"error": "Missing required field: nome"}), 400
 
     try:
+        predio_id = normalize_uuid_id(predio_id, 'predio_id')
         predio = db.update_predio(
             predio_id=predio_id,
             nome=nome,
@@ -385,7 +401,7 @@ def update_predio(predio_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/predios/<int:predio_id>', methods=['DELETE'])
+@app.route('/api/predios/<string:predio_id>', methods=['DELETE'])
 def delete_predio(predio_id):
     """Exclui um prédio.
 
@@ -393,6 +409,7 @@ def delete_predio(predio_id):
         predio_id: id do prédio recebido na rota.
     """
     try:
+        predio_id = normalize_uuid_id(predio_id, 'predio_id')
         result = db.delete_predio(predio_id=predio_id)
         return jsonify(result), 200
     except ValueError as e:
@@ -400,7 +417,7 @@ def delete_predio(predio_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/camaras/<int:camara_id>', methods=['GET'])
+@app.route('/api/camaras/<string:camara_id>', methods=['GET'])
 def get_camara_detalhes(camara_id):
     """Retorna detalhes e ocupação de uma câmara.
 
@@ -408,10 +425,13 @@ def get_camara_detalhes(camara_id):
         camara_id: id da câmara recebido na rota.
     """
     try:
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
         camara = db.fetch_camara_detalhes(camara_id)
         if not camara:
             return jsonify({"error": "Camara not found"}), 404
         return jsonify(camara), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -431,6 +451,7 @@ def create_camara():
         return jsonify({"error": "Missing required fields: predio_id and nome"}), 400
 
     try:
+        predio_id = normalize_uuid_id(predio_id, 'predio_id')
         camara = db.create_camara(
             predio_id=predio_id,
             nome=nome,
@@ -443,7 +464,7 @@ def create_camara():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/camaras/<int:camara_id>', methods=['PUT'])
+@app.route('/api/camaras/<string:camara_id>', methods=['PUT'])
 def update_camara(camara_id):
     """Atualiza uma câmara.
 
@@ -459,6 +480,8 @@ def update_camara(camara_id):
         return jsonify({"error": "Missing required fields: predio_id and nome"}), 400
 
     try:
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
+        predio_id = normalize_uuid_id(predio_id, 'predio_id')
         camara = db.update_camara(
             camara_id=camara_id,
             predio_id=predio_id,
@@ -472,7 +495,7 @@ def update_camara(camara_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/camaras/<int:camara_id>', methods=['DELETE'])
+@app.route('/api/camaras/<string:camara_id>', methods=['DELETE'])
 def delete_camara(camara_id):
     """Exclui uma câmara.
 
@@ -480,6 +503,7 @@ def delete_camara(camara_id):
         camara_id: id da câmara recebido na rota.
     """
     try:
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
         result = db.delete_camara(camara_id=camara_id)
         return jsonify(result), 200
     except ValueError as e:
@@ -502,6 +526,7 @@ def create_sensor():
         return jsonify({"error": "Missing required field: camara_id"}), 400
 
     try:
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
         sensor = db.create_sensor(
             camara_id=camara_id,
             modelo=modelo,
@@ -514,7 +539,7 @@ def create_sensor():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/sensores/<int:sensor_id>', methods=['PUT'])
+@app.route('/api/sensores/<string:sensor_id>', methods=['PUT'])
 def update_sensor(sensor_id):
     """Atualiza um sensor.
 
@@ -530,6 +555,8 @@ def update_sensor(sensor_id):
         return jsonify({"error": "Missing required field: camara_id"}), 400
 
     try:
+        sensor_id = normalize_uuid_id(sensor_id, 'sensor_id')
+        camara_id = normalize_uuid_id(camara_id, 'camara_id')
         sensor = db.update_sensor(
             sensor_id=sensor_id,
             camara_id=camara_id,
@@ -543,7 +570,7 @@ def update_sensor(sensor_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/sensores/<int:sensor_id>', methods=['DELETE'])
+@app.route('/api/sensores/<string:sensor_id>', methods=['DELETE'])
 def delete_sensor(sensor_id):
     """Exclui um sensor.
 
@@ -551,6 +578,7 @@ def delete_sensor(sensor_id):
         sensor_id: id do sensor recebido na rota.
     """
     try:
+        sensor_id = normalize_uuid_id(sensor_id, 'sensor_id')
         result = db.delete_sensor(sensor_id=sensor_id)
         return jsonify(result), 200
     except ValueError as e:
@@ -575,6 +603,7 @@ def handle_tag_event():
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
+        sensor_id = normalize_uuid_id(sensor_id, 'sensor_id')
         success, message = db.process_tag_event(epc_tag, sensor_id, event, rssi)
         if not success:
             return jsonify({"error": message}), 404

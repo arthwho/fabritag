@@ -96,6 +96,15 @@ function getValidatedCpfCnpjOrNull(rawValue) {
     return digits;
 }
 
+function parseRequiredId(rawValue, errorMessage) {
+    const value = String(rawValue ?? '').trim();
+    if (!value) {
+        throw new Error(errorMessage);
+    }
+
+    return value;
+}
+
 /**
  * Extrai uma mensagem de erro de uma resposta HTTP da API.
  *
@@ -197,11 +206,14 @@ export const actions = {
 
     update: async ({ request, fetch }) => {
         const formData = await request.formData();
-        const clienteId = Number(formData.get('clienteId'));
+        const clienteIdRaw = formData.get('clienteId');
         const nome = String(formData.get('nome') || '').trim();
         const cpfCnpjRaw = String(formData.get('cpfCnpj') || '');
 
-        if (!Number.isInteger(clienteId) || clienteId <= 0) {
+        let clienteId = '';
+        try {
+            clienteId = parseRequiredId(clienteIdRaw, 'Cliente inválido para atualização.');
+        } catch {
             return fail(400, {
                 action: 'update',
                 error: 'Cliente inválido para atualização.',
@@ -242,9 +254,12 @@ export const actions = {
 
     delete: async ({ request, fetch }) => {
         const formData = await request.formData();
-        const clienteId = Number(formData.get('clienteId'));
+        const clienteIdRaw = formData.get('clienteId');
 
-        if (!Number.isInteger(clienteId) || clienteId <= 0) {
+        let clienteId = '';
+        try {
+            clienteId = parseRequiredId(clienteIdRaw, 'Cliente inválido para exclusão.');
+        } catch {
             return fail(400, {
                 action: 'delete',
                 error: 'Cliente inválido para exclusão.'

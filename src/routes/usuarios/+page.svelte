@@ -25,16 +25,16 @@
 	let { data, form } = $props();
 
 	type UsuarioRow = {
-		id: number;
+		id: string;
 		nome_completo?: string | null;
 		email: string;
-		cliente_id: number | null;
+		cliente_id: string | null;
 		cliente_nome: string | null;
 		has_password?: boolean;
 	};
 
 	type ClienteRow = {
-		id: number;
+		id: string;
 		nome?: string | null;
 		nome_razao_social?: string | null;
 	};
@@ -58,7 +58,7 @@
 
 	let searchUsuarios = $state('');
 	let isUsuarioModalOpen = $state(false);
-	let editingUsuarioId = $state<number | null>(null);
+	let editingUsuarioId = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let formError = $state('');
 	let usuarioNomeCompleto = $state('');
@@ -67,7 +67,7 @@
 	let usuarioClienteId = $state('');
 	let usuarioIsAlsoCliente = $state(false);
 	let usuarioCpfCnpj = $state('');
-	let deleteForms = $state<Record<number, HTMLFormElement | undefined>>({});
+	let deleteForms = $state<Record<string, HTMLFormElement | undefined>>({});
 
 	/** Normaliza texto para filtros sem acento e sem diferenciar maiúsculas. */
 	const normalize = (str: string) =>
@@ -121,7 +121,7 @@
 	}
 
 	/** Preenche o modal com dados do usuário selecionado para edição. */
-	function handleEditUsuario(usuarioId: number) {
+	function handleEditUsuario(usuarioId: string) {
 		const usuario = usuarios.find((item) => item.id === usuarioId);
 		if (!usuario) return;
 
@@ -137,7 +137,7 @@
 	}
 
 	/** Confirma e envia a exclusão do usuário selecionado. */
-	function handleDeleteUsuario(usuarioId: number) {
+	function handleDeleteUsuario(usuarioId: string) {
 		if (!window.confirm('Tem certeza que deseja excluir este usuário?')) return;
 		deleteForms[usuarioId]?.requestSubmit();
 	}
