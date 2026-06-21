@@ -593,7 +593,7 @@ def handle_tag_event():
     Espera JSON com epc_tag, sensor_id e rssi opcional. Encaminha o
     processamento para db.process_tag_event().
     """
-    data = request.json
+    data = request.get_json(silent=True) or {}
     epc_tag = data.get('epc_tag')
     sensor_id = data.get('sensor_id')
     event = data.get('event', 'READ')
@@ -608,6 +608,8 @@ def handle_tag_event():
         if not success:
             return jsonify({"error": message}), 404
         return jsonify({"message": message}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), value_error_status(str(e))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

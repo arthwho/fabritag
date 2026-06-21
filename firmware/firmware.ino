@@ -27,7 +27,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // --- NETWORK & API CONFIGURATION ---
 String serverUrl = "http://192.168.2.174:5000/api/tag_event";
-String sensorId = "1";
+String sensorId = "";
 bool isWifiConnected = false;
 bool shouldSaveConfig = false;
 
@@ -78,7 +78,7 @@ const char *customPortalCSS =
 
 // --- GLOBAL WIFIMANAGER PARAMETERS ---
 WiFiManagerParameter custom_server_url("serverUrl", "Backend Server URL", "", 60);
-WiFiManagerParameter custom_sensor_id("sensorId", "Sensor ID", "", 10);
+WiFiManagerParameter custom_sensor_id("sensorId", "Sensor UUID", "", 40);
 
 // --- FUNCTION PROTOTYPES ---
 // Notice the default arguments (= "") are placed HERE!
@@ -92,6 +92,7 @@ void performServerHealthCheck();
 void sendTagEvent(String uid, String eventType);
 void handleWiFiConnection();
 void sendHeartbeat();
+bool isUuidLike(String value);
 String uidToString(uint8_t *uid, uint8_t length);
 bool initializeNfc();
 bool waitForPn5180Busy(uint8_t expectedLevel, unsigned long timeoutMs);

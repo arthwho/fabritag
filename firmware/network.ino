@@ -1,8 +1,32 @@
+bool isHexChar(char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+bool isUuidLike(String value) {
+  value.trim();
+
+  if (value.length() != 36) {
+    return false;
+  }
+
+  for (int i = 0; i < value.length(); i++) {
+    bool shouldBeDash = i == 8 || i == 13 || i == 18 || i == 23;
+    if (shouldBeDash && value.charAt(i) != '-') {
+      return false;
+    }
+    if (!shouldBeDash && !isHexChar(value.charAt(i))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void setupWiFi() {
   Preferences preferences;
   preferences.begin("appData", true); 
   serverUrl = preferences.getString("serverUrl", "http://192.168.2.174:5000/api/tag_event"); 
-  sensorId = preferences.getString("sensorId", "1");
+  sensorId = preferences.getString("sensorId", "");
   preferences.end();
 
   WiFiManager wm;
@@ -18,7 +42,7 @@ void setupWiFi() {
   wm.setCustomHeadElement(customPortalCSS);
 
   custom_server_url.setValue(serverUrl.c_str(), 60);
-  custom_sensor_id.setValue(sensorId.c_str(), 10);
+  custom_sensor_id.setValue(sensorId.c_str(), 40);
 
   wm.addParameter(&custom_server_url);
   wm.addParameter(&custom_sensor_id);
@@ -44,6 +68,29 @@ void setupWiFi() {
   Serial.println("\nWiFi connected.");
   updateScreen("WiFi Connected!", WiFi.localIP().toString());
   delay(1500); 
+
+  if (!isUuidLike(sensorId)) {
+    Serial.println("Sensor UUID is missing or invalid. Opening setup portal.");
+    updateScreen("Sensor UUID", "Opening Setup Portal");
+    digitalWrite(LED_PIN, HIGH);
+
+    if (!wm.startConfigPortal("Fabritag-Setup")) {
+      Serial.println("Portal timeout, rebooting...");
+      delay(3000);
+      ESP.restart();
+    }
+
+    serverUrl = custom_server_url.getValue();
+    sensorId = custom_sensor_id.getValue();
+
+    Preferences preferences;
+    preferences.begin("appData", false);
+    preferences.putString("serverUrl", serverUrl);
+    preferences.putString("sensorId", sensorId);
+    preferences.end();
+
+    ESP.restart();
+  }
 }
 
 void performServerHealthCheck() {
@@ -130,7 +177,18 @@ void handleWiFiConnection() {
   WiFi.reconnect();
 }
 
+String jsonEscape(String value) {
+  value.replace("\\", "\\\\");
+  value.replace("\"", "\\\"");
+  return value;
+}
+
 void sendHeartbeat() {
+  if (sensorId.length() == 0) {
+    Serial.println("Heartbeat skipped: Sensor UUID is not configured.");
+    return;
+  }
+
   String pingUrl = serverUrl;
   pingUrl.replace("tag_event", "dispositivos/ping");
 
@@ -140,7 +198,7 @@ void sendHeartbeat() {
   http.setTimeout(2000);
   http.addHeader("Content-Type", "application/json");
 
-  String jsonPayload = "{\"dispositivo_id\": " + sensorId + "}";
+  String jsonPayload = "{\"dispositivo_id\":\"" + jsonEscape(sensorId) + "\"}";
   int httpResponseCode = http.POST(jsonPayload);
   http.end();
 
@@ -150,6 +208,12 @@ void sendHeartbeat() {
 }
 
 void sendTagEvent(String uid, String eventType) {
+  if (sensorId.length() == 0) {
+    Serial.println("Tag event skipped: Sensor UUID is not configured.");
+    updateScreen("Sensor UUID", "Not configured");
+    return;
+  }
+
   if (isWifiConnected && WiFi.status() == WL_CONNECTED) {
     updateScreen("Tag: " + uid, "Event: " + eventType, "Syncing DB...");
     digitalWrite(LED_PIN, HIGH); 
@@ -160,14 +224,16 @@ void sendTagEvent(String uid, String eventType) {
     http.setTimeout(2000);
     http.addHeader("Content-Type", "application/json");
 
-    String jsonPayload = "{\"epc_tag\": \"" + uid + "\", \"sensor_id\": " + sensorId + ", \"event\": \"" + eventType + "\", \"rssi\": 0}";
+    String jsonPayload = "{\"epc_tag\":\"" + jsonEscape(uid) + "\",\"sensor_id\":\"" + jsonEscape(sensorId) + "\",\"event\":\"" + jsonEscape(eventType) + "\",\"rssi\":0}";
     
     int httpResponseCode = http.POST(jsonPayload);
+    String responseBody = http.getString();
+    Serial.println("Tag event HTTP " + String(httpResponseCode) + ": " + responseBody);
     
-    if (httpResponseCode > 0) {
+    if (httpResponseCode >= 200 && httpResponseCode < 300) {
       updateScreen("Tag: " + uid, "Event: " + eventType, "DB Sync: SUCCESS");
     } else {
-      updateScreen("Tag: " + uid, "Event: " + eventType, "DB Sync: FAILED");
+      updateScreen("Tag: " + uid, "Event: " + eventType, "DB Sync: HTTP " + String(httpResponseCode));
     }
     http.end();
     digitalWrite(LED_PIN, LOW); 
