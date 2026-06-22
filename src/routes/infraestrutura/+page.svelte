@@ -54,9 +54,15 @@
 	let { data, form } = $props();
 	let infraestrutura = $derived(data.infraestrutura);
 	let actionResult = $derived((form || null) as InfraActionResult | null);
-	let deviceStatus = $derived(
-		sensorStore.liveStatuses['1'] || { status: 'Offline', ip_address: 'N/A' }
-	);
+	const offlineStatus = { status: 'Offline', ip_address: 'N/A' };
+	let deviceStatus = $derived.by(() => {
+		const statuses = sensorStore.liveStatuses || {};
+		const onlineStatus = Object.values(statuses).find((status) => status?.status === 'Online');
+		if (onlineStatus) return onlineStatus;
+
+		const firstSensorId = infraestrutura?.lista_sensores?.[0]?.id;
+		return (firstSensorId && statuses[firstSensorId]) || offlineStatus;
+	});
 	let searchTermAll = $state('');
 	let searchTermPredios = $state('');
 	let searchTermCamaras = $state('');
@@ -101,12 +107,23 @@
 			.normalize('NFD')
 			.replace(/[\u0300-\u036f]/g, '');
 
-	let filteredItems = $derived(
-		infraestrutura?.lista_sensores?.filter((item) => {
+	let filteredItems = $derived.by(() => {
+		const statuses = sensorStore.liveStatuses || {};
+		const sensores =
+			infraestrutura?.lista_sensores?.map((sensor) => {
+				const liveStatus = statuses[sensor.id];
+				return {
+					...sensor,
+					status: liveStatus?.status || (sensor.ativo ? 'Offline' : 'Inativo'),
+					ip_address: liveStatus?.ip_address || 'N/A'
+				};
+			}) || [];
+
+		return sensores.filter((item) => {
 			const search = normalize(searchTerm);
 			return Object.values(item).some((val) => normalize((val ?? '').toString()).includes(search));
-		}) || []
-	);
+		});
+	});
 
 	let filteredPredios = $derived(
 		infraestrutura?.lista_predios?.filter((item) => {

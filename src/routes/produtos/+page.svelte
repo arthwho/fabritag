@@ -49,9 +49,9 @@
 		id?: string;
 		epc_tag: string;
 		produto_tipo_id: string | null;
-		produto_tipo_ids?: string[];
+		produto_tipo_ids?: string[] | string;
 		produto_nome: string | null;
-		produto_nomes?: string[];
+		produto_nomes?: string[] | string;
 		produto_assoc?: Array<{
 			produto_tipo_id: string;
 			produto_nome: string;
@@ -143,6 +143,20 @@
 		return normalized === 'un' || normalized === 'unidade';
 	}
 
+	function toArray<T>(value: T[] | T | null | undefined) {
+		if (Array.isArray(value)) return value;
+		if (value == null || value === '' || value === '{}') return [];
+		return [value];
+	}
+
+	function getLoteProdutoTipoIds(lote: LoteRow) {
+		return toArray(lote.produto_tipo_ids).map((id) => String(id));
+	}
+
+	function getLoteProdutoNomes(lote: LoteRow) {
+		return toArray(lote.produto_nomes).map((nome) => String(nome));
+	}
+
 	let filteredProdutos = $derived(
 		produtos.filter((item) => {
 			const search = normalize(searchProdutos);
@@ -217,8 +231,8 @@
 		const ids =
 			lote.produto_assoc && lote.produto_assoc.length > 0
 				? lote.produto_assoc.map((assoc) => assoc.produto_tipo_id)
-				: lote.produto_tipo_ids && lote.produto_tipo_ids.length > 0
-					? lote.produto_tipo_ids
+				: getLoteProdutoTipoIds(lote).length > 0
+					? getLoteProdutoTipoIds(lote)
 					: lote.produto_tipo_id == null
 						? []
 						: [lote.produto_tipo_id];
@@ -577,8 +591,8 @@
 					<TableBodyRow>
 						<TableBodyCell>{lote.epc_tag || lote.id}</TableBodyCell>
 						<TableBodyCell
-							>{lote.produto_tipo_ids && lote.produto_tipo_ids.length > 0
-								? lote.produto_tipo_ids.join(', ')
+							>{getLoteProdutoTipoIds(lote).length > 0
+								? getLoteProdutoTipoIds(lote).join(', ')
 								: (lote.produto_tipo_id ?? '-')}</TableBodyCell
 						>
 						<TableBodyCell>
@@ -589,8 +603,8 @@
 										: ''}
 								{/each}
 							{:else}
-								{lote.produto_nomes && lote.produto_nomes.length > 0
-									? lote.produto_nomes.join(', ')
+								{getLoteProdutoNomes(lote).length > 0
+									? getLoteProdutoNomes(lote).join(', ')
 									: lote.produto_nome || lote.nome || '-'}
 							{/if}
 						</TableBodyCell>

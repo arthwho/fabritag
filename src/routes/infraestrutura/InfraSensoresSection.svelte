@@ -23,6 +23,7 @@
 		dispositivo: string;
 		dispositivo_id: string | null;
 		status: string;
+		ip_address?: string;
 		ativo: boolean;
 	};
 
@@ -86,7 +87,7 @@
 				</TableBodyCell>
 				<TableBodyCell>{sensor.dispositivo || '-'}</TableBodyCell>
 				<TableBodyCell>
-					<Badge border large color={sensor.ativo ? 'green' : 'red'}>
+					<Badge border large color={sensor.status === 'Online' ? 'green' : 'red'}>
 						{sensor.status}
 					</Badge>
 				</TableBodyCell>
