@@ -1333,6 +1333,7 @@ def fetch_pagina_produtos_data():
     cur = conn.cursor()
     try:
         _ensure_lote_produto_assoc_table(cur)
+        _ensure_lote_location_columns(cur)
 
         cur.execute(
             "SELECT pt.id, pt.cliente_id, COALESCE(c.nome_razao_social, '-'), pt.nome, pt.sku, pt.unidade_medida, COUNT(DISTINCT lt.epc_tag) "
@@ -1358,6 +1359,8 @@ def fetch_pagina_produtos_data():
             "SELECT epc_tag FROM LOTE_TAGGEADO "
             "WHERE NOT EXISTS (SELECT 1 FROM LOTE_PRODUTO_ASSOC lpa WHERE lpa.epc_tag = LOTE_TAGGEADO.epc_tag) "
             "AND (produto_tipo_id IS NULL OR produto_tipo_id NOT IN (SELECT id FROM PRODUTO_TIPO)) "
+            "AND camara_id IS NOT NULL "
+            "AND status = 'ATIVO' "
             "ORDER BY epc_tag"
         )
         lotes_sem_produto = [{"epc_tag": row[0]} for row in cur.fetchall()]

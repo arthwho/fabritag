@@ -1,7 +1,9 @@
 <script>
 	import '../app.css';
+	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '../lib/components/sidebar.svelte';
+	import GlobalLoteDetector from './GlobalLoteDetector.svelte';
 	import { Button, Dropdown, DropdownItem, Avatar, DropdownGroup } from 'flowbite-svelte';
 	import {
 		AdjustmentsHorizontalOutline,
@@ -19,6 +21,9 @@
 	const pageDescription = $derived.by(() => $page.data.pageDescription || '');
 	const pageBackHref = $derived.by(() => $page.data.pageBackHref || '');
 	const pageBackLabel = $derived.by(() => $page.data.pageBackLabel || 'Voltar');
+	let lotesSemProduto = $state([]);
+	let notificationError = $state('');
+	const notificationCount = $derived(lotesSemProduto.length);
 	const displayName = $derived.by(() => {
 		const user = data.currentUser;
 		if (user?.nome_completo) return user.nome_completo;
@@ -26,6 +31,30 @@
 		if (!email) return 'Usuário';
 		const [namePart] = email.split('@');
 		return namePart || 'Usuário';
+	});
+	async function refreshNotifications() {
+		if ($page.url.pathname.startsWith('/login') || $page.url.pathname.startsWith('/registro')) {
+			lotesSemProduto = [];
+			return;
+		}
+
+		try {
+			const response = await fetch('http://127.0.0.1:5000/api/produtos');
+			if (!response.ok) return;
+
+			const payload = await response.json();
+			lotesSemProduto = Array.isArray(payload?.lotes_sem_produto) ? payload.lotes_sem_produto : [];
+			notificationError = '';
+		} catch (error) {
+			notificationError = 'Nao foi possivel atualizar as notificacoes.';
+		}
+	}
+
+	onMount(() => {
+		refreshNotifications();
+		const interval = setInterval(refreshNotifications, 3000);
+
+		return () => clearInterval(interval);
 	});
 </script>
 
@@ -71,11 +100,15 @@
 						class="inline-flex items-center text-center text-sm font-medium text-gray-500 hover:text-gray-900 focus:outline-hidden dark:text-gray-400 dark:hover:text-white"
 					>
 						<BellSolid class="h-8 w-8" />
-						<div class="relative flex">
-							<div
-								class="relative end-4 -top-2 inline-flex h-3 w-3 rounded-full border-2 border-white bg-red-500 dark:border-gray-900"
-							></div>
-						</div>
+						{#if notificationCount > 0}
+							<div class="relative flex">
+								<div
+									class="relative end-4 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-xs font-semibold text-white dark:border-gray-900"
+								>
+									{notificationCount > 9 ? '9+' : notificationCount}
+								</div>
+							</div>
+						{/if}
 					</div>
 					<Dropdown
 						triggeredBy="#bell"
@@ -83,44 +116,33 @@
 					>
 						<div class="py-2 text-center font-bold">Notificações</div>
 						<DropdownGroup>
-							<DropdownItem class="flex space-x-4 rtl:space-x-reverse">
-								<Avatar src="/images/profile-picture-1.webp" dot={{ color: 'gray' }} />
-								<div class="w-full ps-3">
-									<div class="mb-1.5 text-sm text-gray-500 dark:text-gray-400">
-										New message from <span class="font-semibold text-gray-900 dark:text-white"
-											>Jese Leos</span
+							{#if lotesSemProduto.length > 0}
+								{#each lotesSemProduto as lote}
+									<DropdownItem href="/produtos" class="flex space-x-4 rtl:space-x-reverse">
+										<div
+											class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-700"
 										>
-										: "Hey, what's up? All set for the presentation?"
-									</div>
-									<div class="text-xs text-primary-600 dark:text-primary-500">
-										a few moments ago
-									</div>
+											!
+										</div>
+										<div class="w-full ps-3">
+											<div class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+												<span class="font-semibold text-gray-900 dark:text-white">
+													Lote sem produto
+												</span>
+											</div>
+											<div class="text-xs text-primary-600 dark:text-primary-500">
+												EPC {lote.epc_tag} aguardando configuração.
+											</div>
+										</div>
+									</DropdownItem>
+								{/each}
+							{:else if notificationError}
+								<div class="px-4 py-3 text-sm text-red-600">{notificationError}</div>
+							{:else}
+								<div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+									Nenhuma notificação no momento.
 								</div>
-							</DropdownItem>
-							<DropdownItem class="flex space-x-4 rtl:space-x-reverse">
-								<Avatar src="/images/profile-picture-2.webp" dot={{ color: 'red' }} />
-								<div class="w-full ps-3">
-									<div class="mb-1.5 text-sm text-gray-500 dark:text-gray-400">
-										<span class="font-semibold text-gray-900 dark:text-white">Joseph Mcfall</span>
-										and
-										<span class="font-medium text-gray-900 dark:text-white">5 others</span>
-										started following you.
-									</div>
-									<div class="text-xs text-primary-600 dark:text-primary-500">10 minutes ago</div>
-								</div>
-							</DropdownItem>
-							<DropdownItem class="flex space-x-4 rtl:space-x-reverse">
-								<Avatar src="/images/profile-picture-3.webp" dot={{ color: 'green' }} />
-								<div class="w-full ps-3">
-									<div class="mb-1.5 text-sm text-gray-500 dark:text-gray-400">
-										<span class="font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-										and
-										<span class="font-medium text-gray-900 dark:text-white">141 others</span>
-										love your story. See it and view more stories.
-									</div>
-									<div class="text-xs text-primary-600 dark:text-primary-500">44 minutes ago</div>
-								</div>
-							</DropdownItem>
+							{/if}
 						</DropdownGroup>
 					</Dropdown>
 
@@ -156,6 +178,7 @@
 				</div>
 			</header>
 			{@render children()}
+			<GlobalLoteDetector />
 		</main>
 	</div>
 {/if}

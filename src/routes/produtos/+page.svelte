@@ -19,8 +19,8 @@
 	import InfoCard from '$lib/components/InfoCard.svelte';
 	import TableActions from '$lib/components/TableActions.svelte';
 	import RowActionsMenu from '$lib/components/RowActionsMenu.svelte';
+	import LoteEditModal from './LoteEditModal.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { fly } from 'svelte/transition';
 
 	let { data, form } = $props();
 
@@ -81,7 +81,6 @@
 	let clientes = $derived((data.clientes || []) as ClienteOption[]);
 	let camaras = $derived((data.camaras || []) as CamaraOption[]);
 	let lotes = $derived((data.lotes || []) as LoteRow[]);
-	let lotesSemProduto = $derived(data.lotesSemProduto || []);
 	let activeSection = $state<'produtos' | 'lotes'>('produtos');
 	let searchProdutos = $state('');
 	let searchLotes = $state('');
@@ -137,12 +136,6 @@
 		{ value: 'ha', label: 'Area: Hectare (ha)' }
 	];
 
-	/** Indica se a unidade exige quantidade inteira. */
-	function isUnidadeInteira(unidadeMedida: string | null | undefined) {
-		const normalized = normalize(unidadeMedida || '');
-		return normalized === 'un' || normalized === 'unidade';
-	}
-
 	function toArray<T>(value: T[] | T | null | undefined) {
 		if (Array.isArray(value)) return value;
 		if (value == null || value === '' || value === '{}') return [];
@@ -168,19 +161,6 @@
 		lotes.filter((item) => {
 			const search = normalize(searchLotes);
 			return Object.values(item).some((val) => normalize((val ?? '').toString()).includes(search));
-		})
-	);
-
-	let filteredProdutosForLoteSelect = $derived(
-		produtos.filter((produto) => {
-			const id = produto.id.toString();
-			if (loteProdutoTipoIds.includes(id)) return true;
-
-			const search = normalize(loteProdutoSearch);
-			if (!search) return true;
-
-			const haystack = `${produto.id} ${produto.nome} ${produto.sku || ''}`;
-			return normalize(haystack).includes(search);
 		})
 	);
 
@@ -265,47 +245,6 @@
 		movingLoteEpcTag = editingLoteEpcTag;
 		moveDestinoCamaraId = '';
 		isMoveLoteModalOpen = true;
-	}
-
-	/** Mantém apenas quantidades dos produtos selecionados no lote. */
-	function syncLoteQuantidades() {
-		const next: Record<string, string> = {};
-		for (const id of loteProdutoTipoIds) {
-			next[id] = loteQuantidades[id] ?? '1';
-		}
-		loteQuantidades = next;
-	}
-
-	/** Retorna o nome de um produto pelo id usado no formulário de lote. */
-	function getProdutoNomeById(id: string) {
-		const produto = produtos.find((item) => String(item.id) === id);
-		return produto?.nome || `Produto ${id}`;
-	}
-
-	/** Retorna a unidade de medida de um produto pelo id. */
-	function getProdutoUnidadeById(id: string) {
-		const produto = produtos.find((item) => String(item.id) === id);
-		return produto?.unidade_medida || null;
-	}
-
-	/** Define o step do input de quantidade conforme a unidade do produto. */
-	function getStepForProduto(id: string) {
-		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
-	}
-
-	/** Define o mínimo do input de quantidade conforme a unidade do produto. */
-	function getMinForProduto(id: string) {
-		return isUnidadeInteira(getProdutoUnidadeById(id)) ? '1' : '0.01';
-	}
-
-	/** Serializa produtos selecionados e quantidades para envio ao action server-side. */
-	function buildProdutoAssocJson() {
-		const produtoAssoc = loteProdutoTipoIds.map((idValue) => ({
-			produto_tipo_id: idValue,
-			quantidade: Number(loteQuantidades[idValue])
-		}));
-
-		return JSON.stringify(produtoAssoc);
 	}
 
 	const handleProdutoSubmit: SubmitFunction = () => {
@@ -451,15 +390,6 @@
 		<Alert class="mt-4">
 			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
 			{formError}
-		</Alert>
-	{/if}
-
-	{#if lotesSemProduto.length > 0}
-		<Alert dismissable transition={fly} class="mt-8">
-			{#snippet icon()}<InfoCircleSolid class="h-4 w-4" />{/snippet}
-			<div class="font-medium">
-				{lotesSemProduto.length} lote(s) encontrados sem vínculo com PRODUTO_TIPO.
-			</div>
 		</Alert>
 	{/if}
 
@@ -685,71 +615,21 @@
 		</form>
 	</Modal>
 
-	<Modal bind:open={isLoteModalOpen} title={loteModalTitle} size="md">
-		<form class="space-y-4" method="POST" action="?/updateLote" use:enhance={handleLoteSubmit}>
-			<input type="hidden" name="epcTag" value={editingLoteEpcTag} />
-			<input type="hidden" name="produtoAssocJson" value={buildProdutoAssocJson()} />
-			<div>
-				<Label for="lote-epc-tag">EPC Tag</Label>
-				<Input id="lote-epc-tag" value={editingLoteEpcTag} disabled />
-			</div>
-			<div>
-				<Label for="lote-produto">Produtos associados</Label>
-				<Input
-					id="lote-produto-search"
-					placeholder="Pesquisar produto por ID, nome ou SKU..."
-					bind:value={loteProdutoSearch}
-					class="mb-2"
-				/>
-				<Select
-					id="lote-produto"
-					bind:value={loteProdutoTipoIds}
-					multiple
-					onchange={syncLoteQuantidades}
-				>
-					{#each filteredProdutosForLoteSelect as produto}
-						<option value={produto.id.toString()}>
-							{produto.id} - {produto.nome}{produto.sku ? ` (${produto.sku})` : ''}
-						</option>
-					{/each}
-				</Select>
-				<p class="mt-1 text-xs text-gray-500">
-					Segure Ctrl (ou Cmd) para selecionar mais de um produto.
-				</p>
-			</div>
-			{#if loteProdutoTipoIds.length > 0}
-				<div class="space-y-3">
-					<Label>Quantidade por produto</Label>
-					{#each loteProdutoTipoIds as produtoId}
-						<div class="grid grid-cols-1 gap-2 md:grid-cols-[1fr_140px] md:items-center">
-							<p class="text-sm text-gray-700">{getProdutoNomeById(produtoId)}</p>
-							<Input
-								type="number"
-								min={getMinForProduto(produtoId)}
-								step={getStepForProduto(produtoId)}
-								bind:value={loteQuantidades[produtoId]}
-								required
-							/>
-						</div>
-					{/each}
-				</div>
-			{/if}
-			{#if formError}
-				<p class="text-sm text-red-600">{formError}</p>
-			{/if}
-			<div class="flex items-center justify-between gap-2">
-				<Button type="button" color="dark" outline onclick={openMoveLoteModal}>
-					Movimentar lote
-				</Button>
-				<div class="flex justify-end gap-2">
-					<Button type="button" color="light" onclick={() => (isLoteModalOpen = false)}>
-						Cancelar
-					</Button>
-					<Button type="submit" color="orange" disabled={isSubmitting}>{loteSubmitLabel}</Button>
-				</div>
-			</div>
-		</form>
-	</Modal>
+	<LoteEditModal
+		bind:open={isLoteModalOpen}
+		title={loteModalTitle}
+		submitLabel={loteSubmitLabel}
+		{editingLoteEpcTag}
+		bind:loteProdutoTipoIds
+		bind:loteProdutoSearch
+		bind:loteQuantidades
+		{formError}
+		{isSubmitting}
+		{produtos}
+		onSubmit={handleLoteSubmit}
+		onNovoProduto={openProdutoModal}
+		onMoveLote={openMoveLoteModal}
+	/>
 
 	<Modal bind:open={isMoveLoteModalOpen} title={moveLoteModalTitle} size="md">
 		<form class="space-y-4" method="POST" action="?/moveLote" use:enhance={handleMoveLoteSubmit}>
