@@ -1,11 +1,21 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import os
+import time
 import database_manager as db
 from auth import auth_bp, init_auth_schema
 from uuid import UUID
 
 app = Flask(__name__)
-CORS(app)
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+]
+CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
 app.register_blueprint(auth_bp)
 
 
@@ -54,7 +64,10 @@ def get_status():
     Usada por health checks ou telas que precisam confirmar que a API Flask
     está online e conectada ao PostgreSQL.
     """
-    return jsonify({"status": "Fabritag Backend Online (PostgreSQL Ready)", "version": "2.0.0"})
+    if not db.database_is_ready():
+        return jsonify({"status": "degraded", "database": "unavailable", "version": "2.0.0"}), 503
+
+    return jsonify({"status": "ok", "database": "ready", "version": "2.0.0"})
 
 @app.route('/api/produto-tipos', methods=['GET'])
 def get_produto_tipos():
@@ -650,8 +663,6 @@ def get_produtos():
         return jsonify({"error": str(e)}), 500
 
 
-import time
-
 # Temporary dictionary to store live device statuses
 # In the future, this can be moved into your PostgreSQL db.
 live_devices = {}
@@ -719,7 +730,31 @@ def get_all_dispositivo_statuses():
         }
     return jsonify(results), 200
 
+def initialize_runtime():
+    """Executa inicializações idempotentes antes de servir requisições."""
+    attempts = max(1, int(os.getenv("DB_STARTUP_RETRIES", "1")))
+    retry_delay = max(0.1, float(os.getenv("DB_STARTUP_RETRY_DELAY", "2")))
+    last_error = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            init_auth_schema()
+            return
+        except Exception as error:
+            last_error = error
+            if attempt == attempts:
+                break
+            print(
+                f"Database initialization attempt {attempt}/{attempts} failed; "
+                f"retrying in {retry_delay}s: {error}"
+            )
+            time.sleep(retry_delay)
+
+    raise RuntimeError("Could not initialize the Fabritag database schema") from last_error
+
+
 if __name__ == '__main__':
     print("Starting Fabritag Backend (Modularized)...")
-    init_auth_schema()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    initialize_runtime()
+    debug_enabled = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_enabled, host='0.0.0.0', port=int(os.getenv("PORT", "5000")))

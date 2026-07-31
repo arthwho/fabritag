@@ -22,3 +22,14 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 node_modules
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Helpers
+/graphify-out
+/.codex
+AGENTS.md
+
+/docs/cientifico-cutural

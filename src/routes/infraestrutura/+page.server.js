@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
+import { backendUrl } from '$lib/server/backend-api';
 
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+const API_BASE_URL = backendUrl('/api');
 
 /**
  * Converte valores de formulário em string aparada.
@@ -116,8 +117,8 @@ async function getApiError(response, fallbackError) {
 export async function load({ fetch }) {
 	try {
 		const [infraRes, liveRes] = await Promise.all([
-			fetch('http://127.0.0.1:5000/api/infraestrutura'),
-			fetch('http://127.0.0.1:5000/api/dispositivos/status')
+			fetch(backendUrl('/api/infraestrutura')),
+			fetch(backendUrl('/api/dispositivos/status'))
 		]);
 
 		let infraData = null;
@@ -284,10 +285,7 @@ export const actions = {
 
 		let predioId = '';
 		try {
-			predioId = parseRequiredId(
-				camaraPredioIdRaw,
-				'Selecione um prédio válido para a câmara.'
-			);
+			predioId = parseRequiredId(camaraPredioIdRaw, 'Selecione um prédio válido para a câmara.');
 		} catch (error) {
 			return fail(400, {
 				action: 'createCamara',
@@ -366,10 +364,7 @@ export const actions = {
 		let predioId = '';
 		try {
 			camaraId = parseRequiredId(camaraIdRaw, 'Câmara inválida para atualização.');
-			predioId = parseRequiredId(
-				camaraPredioIdRaw,
-				'Selecione um prédio válido para a câmara.'
-			);
+			predioId = parseRequiredId(camaraPredioIdRaw, 'Selecione um prédio válido para a câmara.');
 		} catch (error) {
 			return fail(400, {
 				action: 'updateCamara',

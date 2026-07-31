@@ -1,3 +1,5 @@
+import { backendUrl } from '$lib/server/backend-api';
+
 /**
  * Carrega o status do dispositivo principal para a tela de configurações.
  *
@@ -9,7 +11,7 @@
 export async function load({ fetch }) {
 	try {
 		const dispositivoId = 1;
-		const response = await fetch(`http://127.0.0.1:5000/api/dispositivos/status/${dispositivoId}`);
+		const response = await fetch(backendUrl(`/api/dispositivos/status/${dispositivoId}`));
 
 		if (response.ok) {
 			const sensorStatus = await response.json();

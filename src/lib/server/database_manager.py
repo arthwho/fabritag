@@ -1,5 +1,6 @@
 import os
 import math
+import threading
 import psycopg2
 from psycopg2 import pool
 from dotenv import load_dotenv
@@ -12,20 +13,41 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "fabritag")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASS = os.getenv("DB_PASS", "1234")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "5"))
 TAG_ARRIVAL_DEBOUNCE_SECONDS = 5
 
-# Initialize connection pool
+db_pool = None
+_DB_POOL_LOCK = threading.Lock()
+
+
+def _create_connection_pool():
+    """Cria o pool sob demanda e permite recuperação após indisponibilidade."""
+    global db_pool
+    if db_pool is not None:
+        return db_pool
+
+    with _DB_POOL_LOCK:
+        if db_pool is None:
+            db_pool = psycopg2.pool.SimpleConnectionPool(
+                1,
+                10,
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                connect_timeout=DB_CONNECT_TIMEOUT,
+            )
+            print("Database connection pool established.")
+
+    return db_pool
+
+
 try:
-    db_pool = psycopg2.pool.SimpleConnectionPool(1, 10,
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS
-    )
-    print("Database connection pool established.")
+    _create_connection_pool()
 except Exception as e:
-    print(f"Error creating connection pool: {e}")
-    db_pool = None
+    print(f"Database unavailable during startup; connection will be retried: {e}")
 
 def _normalize_uuid_id(value, field_name="id"):
     """Normaliza um identificador UUID recebido da API."""
@@ -40,7 +62,7 @@ def get_db_connection():
     Use esta função antes de executar consultas no banco. A conexão retornada
     deve ser liberada com release_db_connection(conn) no bloco finally.
     """
-    return db_pool.getconn()
+    return _create_connection_pool().getconn()
 
 def release_db_connection(conn):
     """Devolve uma conexão usada ao pool PostgreSQL.
@@ -48,7 +70,30 @@ def release_db_connection(conn):
     Parâmetros:
         conn: conexão obtida com get_db_connection().
     """
+    if conn is None:
+        return
+    if db_pool is None:
+        conn.close()
+        return
     db_pool.putconn(conn)
+
+
+def database_is_ready():
+    """Confirma que uma conexão com o PostgreSQL pode executar consultas."""
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        return cur.fetchone() == (1,)
+    except (psycopg2.Error, AttributeError):
+        return False
+    finally:
+        if cur is not None:
+            cur.close()
+        if conn is not None:
+            release_db_connection(conn)
 
 def _batch_size_from_qty(qty):
     """Converte uma quantidade de lote em número inteiro de vagas ocupadas.

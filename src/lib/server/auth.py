@@ -22,6 +22,8 @@ _ACTIVE_SESSIONS = {}
 _SESSION_LOCK = threading.Lock()
 _SESSION_DURATION_HOURS = 12
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '').strip()
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@fabritag.com').strip().lower()
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
 
 
 def _utcnow():
@@ -369,9 +371,9 @@ def init_auth_schema():
         cur.execute('ALTER TABLE USUARIO ADD COLUMN IF NOT EXISTS foto_perfil_url TEXT')
         cur.execute('ALTER TABLE USUARIO ADD COLUMN IF NOT EXISTS senha_hash VARCHAR(255)')
 
-        cur.execute('SELECT id, senha_hash FROM USUARIO WHERE email = %s LIMIT 1', ('admin@fabritag.com',))
+        cur.execute('SELECT id, senha_hash FROM USUARIO WHERE email = %s LIMIT 1', (ADMIN_EMAIL,))
         admin_row = cur.fetchone()
-        default_password_hash = _hash_password('admin123')
+        default_password_hash = _hash_password(ADMIN_PASSWORD)
 
         if admin_row:
             if not admin_row[1]:
@@ -382,7 +384,7 @@ def init_auth_schema():
             cliente_id = cliente_row[0] if cliente_row else None
             cur.execute(
                 'INSERT INTO USUARIO (nome_completo, email, cliente_id, senha_hash) VALUES (%s, %s, %s, %s)',
-                ('Administrador', 'admin@fabritag.com', cliente_id, default_password_hash),
+                ('Administrador', ADMIN_EMAIL, cliente_id, default_password_hash),
             )
 
         conn.commit()

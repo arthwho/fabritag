@@ -29,6 +29,41 @@ pnpm dev
 
 Para o backend Python (API Flask), use os arquivos em `src/lib/server` e configure variáveis de ambiente para o banco PostgreSQL.
 
+## Docker Compose
+
+O ambiente containerizado separa frontend, backend e PostgreSQL:
+
+```sh
+copy .env.example .env
+docker compose up --build
+```
+
+Depois da inicialização:
+
+- aplicação: `http://localhost:3000`;
+- API Flask e endpoint para os dispositivos RFID: `http://localhost:5000`;
+- PostgreSQL local: `localhost:5432`.
+
+Para acompanhar os serviços:
+
+```sh
+docker compose ps
+docker compose logs -f
+```
+
+Para encerrar sem remover os dados persistidos:
+
+```sh
+docker compose down
+```
+
+Antes de usar fora do ambiente local, altere as senhas do `.env`, configure
+`APP_ORIGIN`, restrinja `CORS_ORIGINS` e ative `COOKIE_SECURE=true`.
+
+As decisões de arquitetura e o caminho planejado para machine learning em
+nuvem estão em
+[`docs/architecture/containerizacao-e-ml.md`](docs/architecture/containerizacao-e-ml.md).
+
 ## Estrutura de pastas
 
 ```text

@@ -1,3 +1,5 @@
+import { backendUrl } from '$lib/server/backend-api';
+
 /**
  * Normaliza texto para busca sem acentos e sem diferenciar maiúsculas.
  *
@@ -66,7 +68,7 @@ function enrichMovimentacoes(dashboardData) {
  */
 export async function load({ fetch }) {
 	try {
-		const response = await fetch('http://127.0.0.1:5000/api/dashboard');
+		const response = await fetch(backendUrl('/api/dashboard'));
 		if (response.ok) {
 			const dashboardData = await response.json();
 			return {

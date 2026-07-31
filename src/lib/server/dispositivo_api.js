@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://127.0.0.1:5000';
+import { backendUrl } from '$lib/server/backend-api';
 
 /**
  * Busca o status ao vivo de todos os dispositivos conhecidos pelo backend.
@@ -8,7 +8,7 @@ const BACKEND_URL = 'http://127.0.0.1:5000';
  */
 export async function getAllDispositivoStatuses(fetchFn) {
 	try {
-		const res = await fetchFn(`${BACKEND_URL}/api/dispositivos/status`);
+		const res = await fetchFn(backendUrl('/api/dispositivos/status'));
 		if (res.ok) return await res.json();
 	} catch (e) {
 		console.error('Error fetching dispositivo statuses:', e);
@@ -25,7 +25,7 @@ export async function getAllDispositivoStatuses(fetchFn) {
  */
 export async function getDispositivoStatus(fetchFn, id) {
 	try {
-		const res = await fetchFn(`${BACKEND_URL}/api/dispositivos/status/${id}`);
+		const res = await fetchFn(backendUrl(`/api/dispositivos/status/${id}`));
 		if (res.ok) return await res.json();
 	} catch (e) {
 		console.error(`Error fetching status for dispositivo ${id}:`, e);

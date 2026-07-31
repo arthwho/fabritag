@@ -1,7 +1,8 @@
 import { fail } from '@sveltejs/kit';
+import { backendUrl } from '$lib/server/backend-api';
 
-const PRODUTOS_API_URL = 'http://127.0.0.1:5000/api/produtos';
-const LOTES_API_URL = 'http://127.0.0.1:5000/api/lotes';
+const PRODUTOS_API_URL = backendUrl('/api/produtos');
+const LOTES_API_URL = backendUrl('/api/lotes');
 
 /**
  * Converte valores de formulário em string aparada.
@@ -19,9 +20,9 @@ const toStringValue = (value) => String(value ?? '').trim();
  * @throws {Error} Quando o valor não é inteiro positivo.
  */
 function parseOptionalId(rawValue) {
-    const value = toStringValue(rawValue);
-    if (!value) return null;
-    return value;
+	const value = toStringValue(rawValue);
+	if (!value) return null;
+	return value;
 }
 
 /**
@@ -32,12 +33,12 @@ function parseOptionalId(rawValue) {
  * @returns {number} Inteiro positivo validado.
  */
 function parseRequiredId(rawValue, errorMessage) {
-    const value = toStringValue(rawValue);
-    if (!value) {
-        throw new Error(errorMessage);
-    }
+	const value = toStringValue(rawValue);
+	if (!value) {
+		throw new Error(errorMessage);
+	}
 
-    return value;
+	return value;
 }
 
 /**
@@ -48,34 +49,34 @@ function parseRequiredId(rawValue, errorMessage) {
  * @throws {Error} Quando o JSON, produto ou quantidade são inválidos.
  */
 function parseProdutoAssoc(rawValue) {
-    let parsed = [];
-    try {
-        parsed = JSON.parse(String(rawValue ?? '[]'));
-    } catch {
-        throw new Error('Dados de produtos do lote inválidos.');
-    }
+	let parsed = [];
+	try {
+		parsed = JSON.parse(String(rawValue ?? '[]'));
+	} catch {
+		throw new Error('Dados de produtos do lote inválidos.');
+	}
 
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('Selecione ao menos um produto.');
-    }
+	if (!Array.isArray(parsed) || parsed.length === 0) {
+		throw new Error('Selecione ao menos um produto.');
+	}
 
-    return parsed.map((item) => {
-        const produtoTipoId = toStringValue(item?.produto_tipo_id);
-        const quantidade = Number(item?.quantidade);
+	return parsed.map((item) => {
+		const produtoTipoId = toStringValue(item?.produto_tipo_id);
+		const quantidade = Number(item?.quantidade);
 
-        if (!produtoTipoId) {
-            throw new Error('Produto associado inválido.');
-        }
+		if (!produtoTipoId) {
+			throw new Error('Produto associado inválido.');
+		}
 
-        if (!Number.isFinite(quantidade) || quantidade <= 0) {
-            throw new Error('Informe uma quantidade válida para os produtos selecionados.');
-        }
+		if (!Number.isFinite(quantidade) || quantidade <= 0) {
+			throw new Error('Informe uma quantidade válida para os produtos selecionados.');
+		}
 
-        return {
-            produto_tipo_id: produtoTipoId,
-            quantidade
-        };
-    });
+		return {
+			produto_tipo_id: produtoTipoId,
+			quantidade
+		};
+	});
 }
 
 /**
@@ -86,11 +87,11 @@ function parseProdutoAssoc(rawValue) {
  * @returns {Promise<string>} Mensagem final de erro.
  */
 async function getApiError(response, fallbackError) {
-    const errorData = await response.json().catch(() => null);
-    if (errorData?.error) return errorData.error;
+	const errorData = await response.json().catch(() => null);
+	if (errorData?.error) return errorData.error;
 
-    const errorText = await response.text().catch(() => '');
-    return errorText || fallbackError;
+	const errorText = await response.text().catch(() => '');
+	return errorText || fallbackError;
 }
 
 /**
@@ -102,296 +103,290 @@ async function getApiError(response, fallbackError) {
  * @type {import('./$types').PageServerLoad}
  */
 export async function load({ fetch }) {
-    try {
-        const [produtosRes, batchesRes, clientesRes, camarasRes] = await Promise.all([
-            fetch('http://127.0.0.1:5000/api/produtos'),
-            fetch('http://127.0.0.1:5000/api/batches'),
-            fetch('http://127.0.0.1:5000/api/clientes'),
-            fetch('http://127.0.0.1:5000/api/camaras')
-        ]);
+	try {
+		const [produtosRes, batchesRes, clientesRes, camarasRes] = await Promise.all([
+			fetch(backendUrl('/api/produtos')),
+			fetch(backendUrl('/api/batches')),
+			fetch(backendUrl('/api/clientes')),
+			fetch(backendUrl('/api/camaras'))
+		]);
 
-        if (!produtosRes.ok || !batchesRes.ok || !clientesRes.ok || !camarasRes.ok) {
-            const produtosText = !produtosRes.ok ? await produtosRes.text() : '';
-            const batchesText = !batchesRes.ok ? await batchesRes.text() : '';
-            const clientesText = !clientesRes.ok ? await clientesRes.text() : '';
-            const camarasText = !camarasRes.ok ? await camarasRes.text() : '';
-            console.error('Failed to fetch produtos page data:', {
-                produtosStatus: produtosRes.status,
-                produtosText,
-                batchesStatus: batchesRes.status,
-                batchesText,
-                clientesStatus: clientesRes.status,
-                clientesText,
-                camarasStatus: camarasRes.status,
-                camarasText
-            });
-            return {
-                pageTitle: 'Produtos',
-                pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
-                produtos: [],
-                lotes: [],
-                lotesSemProduto: [],
-                clientes: [],
-                camaras: [],
-                error: 'Falha ao carregar os dados de produtos e lotes.'
-            };
-        }
+		if (!produtosRes.ok || !batchesRes.ok || !clientesRes.ok || !camarasRes.ok) {
+			const produtosText = !produtosRes.ok ? await produtosRes.text() : '';
+			const batchesText = !batchesRes.ok ? await batchesRes.text() : '';
+			const clientesText = !clientesRes.ok ? await clientesRes.text() : '';
+			const camarasText = !camarasRes.ok ? await camarasRes.text() : '';
+			console.error('Failed to fetch produtos page data:', {
+				produtosStatus: produtosRes.status,
+				produtosText,
+				batchesStatus: batchesRes.status,
+				batchesText,
+				clientesStatus: clientesRes.status,
+				clientesText,
+				camarasStatus: camarasRes.status,
+				camarasText
+			});
+			return {
+				pageTitle: 'Produtos',
+				pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
+				produtos: [],
+				lotes: [],
+				lotesSemProduto: [],
+				clientes: [],
+				camaras: [],
+				error: 'Falha ao carregar os dados de produtos e lotes.'
+			};
+		}
 
-        const produtosData = await produtosRes.json();
-        const batchesData = await batchesRes.json();
-        const clientesData = await clientesRes.json();
-        const camarasData = await camarasRes.json();
+		const produtosData = await produtosRes.json();
+		const batchesData = await batchesRes.json();
+		const clientesData = await clientesRes.json();
+		const camarasData = await camarasRes.json();
 
-        return {
-            pageTitle: 'Produtos',
-            pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
-            produtos: produtosData.produtos || [],
-            lotes: batchesData || [],
-            lotesSemProduto: produtosData.lotes_sem_produto || [],
-            clientes: clientesData || [],
-            camaras: camarasData || [],
-            error: null
-        };
-    } catch (error) {
-        console.error('Error fetching produtos page data:', error);
-        return {
-            pageTitle: 'Produtos',
-            pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
-            produtos: [],
-            lotes: [],
-            lotesSemProduto: [],
-            clientes: [],
-            camaras: [],
-            error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
-        };
-    }
+		return {
+			pageTitle: 'Produtos',
+			pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
+			produtos: produtosData.produtos || [],
+			lotes: batchesData || [],
+			lotesSemProduto: produtosData.lotes_sem_produto || [],
+			clientes: clientesData || [],
+			camaras: camarasData || [],
+			error: null
+		};
+	} catch (error) {
+		console.error('Error fetching produtos page data:', error);
+		return {
+			pageTitle: 'Produtos',
+			pageDescription: 'Visão geral dos produtos e lotes cadastrados.',
+			produtos: [],
+			lotes: [],
+			lotesSemProduto: [],
+			clientes: [],
+			camaras: [],
+			error: 'Não foi possível conectar ao backend. Verifique se o servidor está rodando.'
+		};
+	}
 }
 
 /** @type {import('./$types').Actions} */
 export const actions = {
-    createProduto: async ({ request, fetch }) => {
-        const formData = await request.formData();
-        const nome = toStringValue(formData.get('nome'));
-        const sku = toStringValue(formData.get('sku'));
-        const unidadeMedida = toStringValue(formData.get('unidadeMedida'));
-        const clienteIdRaw = formData.get('clienteId');
+	createProduto: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const nome = toStringValue(formData.get('nome'));
+		const sku = toStringValue(formData.get('sku'));
+		const unidadeMedida = toStringValue(formData.get('unidadeMedida'));
+		const clienteIdRaw = formData.get('clienteId');
 
-        if (!nome) {
-            return fail(400, {
-                action: 'createProduto',
-                error: 'O nome do produto é obrigatório.',
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		if (!nome) {
+			return fail(400, {
+				action: 'createProduto',
+				error: 'O nome do produto é obrigatório.',
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        let clienteId = null;
-        try {
-            clienteId = parseOptionalId(clienteIdRaw);
-        } catch {
-            return fail(400, {
-                action: 'createProduto',
-                error: 'Informe um cliente válido.',
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		let clienteId = null;
+		try {
+			clienteId = parseOptionalId(clienteIdRaw);
+		} catch {
+			return fail(400, {
+				action: 'createProduto',
+				error: 'Informe um cliente válido.',
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        const response = await fetch(PRODUTOS_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente_id: clienteId,
-                nome,
-                sku: sku || null,
-                unidade_medida: unidadeMedida || null
-            })
-        });
+		const response = await fetch(PRODUTOS_API_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				cliente_id: clienteId,
+				nome,
+				sku: sku || null,
+				unidade_medida: unidadeMedida || null
+			})
+		});
 
-        if (!response.ok) {
-            return fail(response.status, {
-                action: 'createProduto',
-                error: await getApiError(response, 'Não foi possível criar o produto.'),
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		if (!response.ok) {
+			return fail(response.status, {
+				action: 'createProduto',
+				error: await getApiError(response, 'Não foi possível criar o produto.'),
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        return { success: true, action: 'createProduto' };
-    },
+		return { success: true, action: 'createProduto' };
+	},
 
-    updateProduto: async ({ request, fetch }) => {
-        const formData = await request.formData();
-        const produtoIdRaw = formData.get('produtoId');
-        const nome = toStringValue(formData.get('nome'));
-        const sku = toStringValue(formData.get('sku'));
-        const unidadeMedida = toStringValue(formData.get('unidadeMedida'));
-        const clienteIdRaw = formData.get('clienteId');
+	updateProduto: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const produtoIdRaw = formData.get('produtoId');
+		const nome = toStringValue(formData.get('nome'));
+		const sku = toStringValue(formData.get('sku'));
+		const unidadeMedida = toStringValue(formData.get('unidadeMedida'));
+		const clienteIdRaw = formData.get('clienteId');
 
-        let produtoId = '';
-        try {
-            produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para atualização.');
-        } catch (error) {
-            return fail(400, {
-                action: 'updateProduto',
-                error: error instanceof Error ? error.message : 'Produto inválido para atualização.',
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		let produtoId = '';
+		try {
+			produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para atualização.');
+		} catch (error) {
+			return fail(400, {
+				action: 'updateProduto',
+				error: error instanceof Error ? error.message : 'Produto inválido para atualização.',
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        if (!nome) {
-            return fail(400, {
-                action: 'updateProduto',
-                error: 'O nome do produto é obrigatório.',
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		if (!nome) {
+			return fail(400, {
+				action: 'updateProduto',
+				error: 'O nome do produto é obrigatório.',
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        let clienteId = null;
-        try {
-            clienteId = parseOptionalId(clienteIdRaw);
-        } catch {
-            return fail(400, {
-                action: 'updateProduto',
-                error: 'Informe um cliente válido.',
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		let clienteId = null;
+		try {
+			clienteId = parseOptionalId(clienteIdRaw);
+		} catch {
+			return fail(400, {
+				action: 'updateProduto',
+				error: 'Informe um cliente válido.',
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        const response = await fetch(`${PRODUTOS_API_URL}/${produtoId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente_id: clienteId,
-                nome,
-                sku: sku || null,
-                unidade_medida: unidadeMedida || null
-            })
-        });
+		const response = await fetch(`${PRODUTOS_API_URL}/${produtoId}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				cliente_id: clienteId,
+				nome,
+				sku: sku || null,
+				unidade_medida: unidadeMedida || null
+			})
+		});
 
-        if (!response.ok) {
-            return fail(response.status, {
-                action: 'updateProduto',
-                error: await getApiError(response, 'Não foi possível atualizar o produto.'),
-                fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
-            });
-        }
+		if (!response.ok) {
+			return fail(response.status, {
+				action: 'updateProduto',
+				error: await getApiError(response, 'Não foi possível atualizar o produto.'),
+				fieldValues: { nome, sku, unidadeMedida, clienteId: toStringValue(clienteIdRaw) }
+			});
+		}
 
-        return { success: true, action: 'updateProduto' };
-    },
+		return { success: true, action: 'updateProduto' };
+	},
 
-    deleteProduto: async ({ request, fetch }) => {
-        const formData = await request.formData();
-        const produtoIdRaw = formData.get('produtoId');
+	deleteProduto: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const produtoIdRaw = formData.get('produtoId');
 
-        let produtoId = '';
-        try {
-            produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para exclusão.');
-        } catch (error) {
-            return fail(400, {
-                action: 'deleteProduto',
-                error: error instanceof Error ? error.message : 'Produto inválido para exclusão.'
-            });
-        }
+		let produtoId = '';
+		try {
+			produtoId = parseRequiredId(produtoIdRaw, 'Produto inválido para exclusão.');
+		} catch (error) {
+			return fail(400, {
+				action: 'deleteProduto',
+				error: error instanceof Error ? error.message : 'Produto inválido para exclusão.'
+			});
+		}
 
-        const response = await fetch(`${PRODUTOS_API_URL}/${produtoId}`, {
-            method: 'DELETE'
-        });
+		const response = await fetch(`${PRODUTOS_API_URL}/${produtoId}`, {
+			method: 'DELETE'
+		});
 
-        if (!response.ok) {
-            return fail(response.status, {
-                action: 'deleteProduto',
-                error: await getApiError(response, 'Não foi possível excluir o produto.')
-            });
-        }
+		if (!response.ok) {
+			return fail(response.status, {
+				action: 'deleteProduto',
+				error: await getApiError(response, 'Não foi possível excluir o produto.')
+			});
+		}
 
-        return { success: true, action: 'deleteProduto' };
-    },
+		return { success: true, action: 'deleteProduto' };
+	},
 
-    updateLote: async ({ request, fetch }) => {
-        const formData = await request.formData();
-        const epcTag = toStringValue(formData.get('epcTag'));
-        const produtoAssocRaw = formData.get('produtoAssocJson');
+	updateLote: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const epcTag = toStringValue(formData.get('epcTag'));
+		const produtoAssocRaw = formData.get('produtoAssocJson');
 
-        if (!epcTag) {
-            return fail(400, {
-                action: 'updateLote',
-                error: 'Lote inválido para atualização.'
-            });
-        }
+		if (!epcTag) {
+			return fail(400, {
+				action: 'updateLote',
+				error: 'Lote inválido para atualização.'
+			});
+		}
 
-        let produtoAssoc = [];
-        try {
-            produtoAssoc = parseProdutoAssoc(produtoAssocRaw);
-        } catch (error) {
-            return fail(400, {
-                action: 'updateLote',
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Dados de produtos do lote inválidos.',
-                fieldValues: {
-                    loteProdutoTipoIds: produtoAssocRaw,
-                    editingLoteEpcTag: epcTag
-                }
-            });
-        }
+		let produtoAssoc = [];
+		try {
+			produtoAssoc = parseProdutoAssoc(produtoAssocRaw);
+		} catch (error) {
+			return fail(400, {
+				action: 'updateLote',
+				error: error instanceof Error ? error.message : 'Dados de produtos do lote inválidos.',
+				fieldValues: {
+					loteProdutoTipoIds: produtoAssocRaw,
+					editingLoteEpcTag: epcTag
+				}
+			});
+		}
 
-        const response = await fetch(`${LOTES_API_URL}/${epcTag}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                produto_assoc: produtoAssoc
-            })
-        });
+		const response = await fetch(`${LOTES_API_URL}/${epcTag}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				produto_assoc: produtoAssoc
+			})
+		});
 
-        if (!response.ok) {
-            return fail(response.status, {
-                action: 'updateLote',
-                error: await getApiError(response, 'Não foi possível atualizar o lote.')
-            });
-        }
+		if (!response.ok) {
+			return fail(response.status, {
+				action: 'updateLote',
+				error: await getApiError(response, 'Não foi possível atualizar o lote.')
+			});
+		}
 
-        return { success: true, action: 'updateLote' };
-    },
+		return { success: true, action: 'updateLote' };
+	},
 
-    moveLote: async ({ request, fetch }) => {
-        const formData = await request.formData();
-        const epcTag = toStringValue(formData.get('epcTag'));
-        const camaraIdRaw = formData.get('camaraId');
+	moveLote: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const epcTag = toStringValue(formData.get('epcTag'));
+		const camaraIdRaw = formData.get('camaraId');
 
-        if (!epcTag) {
-            return fail(400, {
-                action: 'moveLote',
-                error: 'Lote inválido para movimentação.'
-            });
-        }
+		if (!epcTag) {
+			return fail(400, {
+				action: 'moveLote',
+				error: 'Lote inválido para movimentação.'
+			});
+		}
 
-        let camaraId = '';
-        try {
-            camaraId = parseRequiredId(camaraIdRaw, 'Selecione uma câmara de destino válida.');
-        } catch (error) {
-            return fail(400, {
-                action: 'moveLote',
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Selecione uma câmara de destino válida.'
-            });
-        }
+		let camaraId = '';
+		try {
+			camaraId = parseRequiredId(camaraIdRaw, 'Selecione uma câmara de destino válida.');
+		} catch (error) {
+			return fail(400, {
+				action: 'moveLote',
+				error: error instanceof Error ? error.message : 'Selecione uma câmara de destino válida.'
+			});
+		}
 
-        const response = await fetch(`${LOTES_API_URL}/${epcTag}/movimentar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                camara_id: camaraId
-            })
-        });
+		const response = await fetch(`${LOTES_API_URL}/${epcTag}/movimentar`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				camara_id: camaraId
+			})
+		});
 
-        if (!response.ok) {
-            return fail(response.status, {
-                action: 'moveLote',
-                error: await getApiError(response, 'Não foi possível movimentar o lote.')
-            });
-        }
+		if (!response.ok) {
+			return fail(response.status, {
+				action: 'moveLote',
+				error: await getApiError(response, 'Não foi possível movimentar o lote.')
+			});
+		}
 
-        return { success: true, action: 'moveLote' };
-    }
+		return { success: true, action: 'moveLote' };
+	}
 };

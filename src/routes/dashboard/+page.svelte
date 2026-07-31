@@ -17,6 +17,7 @@
 		FileExportOutline
 	} from '$lib/uicomponents.js';
 	import InfoCard from '$lib/components/InfoCard.svelte';
+	import { apiPath } from '$lib/api.js';
 
 	import { sensorStore } from '$lib/dispositivos.svelte.js';
 
@@ -98,7 +99,7 @@
 
 	const refreshDashboard = async () => {
 		try {
-			const response = await fetch('http://127.0.0.1:5000/api/dashboard');
+			const response = await fetch(apiPath('/dashboard'));
 			if (!response.ok) {
 				dashboardError = `Falha ao atualizar dashboard: ${response.statusText}`;
 				return;

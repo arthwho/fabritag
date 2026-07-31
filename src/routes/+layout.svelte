@@ -14,6 +14,7 @@
 		ChevronLeftOutline
 	} from 'flowbite-svelte-icons';
 	import { page } from '$app/stores';
+	import { apiPath } from '$lib/api.js';
 
 	let { children, data } = $props();
 
@@ -39,7 +40,7 @@
 		}
 
 		try {
-			const response = await fetch('http://127.0.0.1:5000/api/produtos');
+			const response = await fetch(apiPath('/produtos'));
 			if (!response.ok) return;
 
 			const payload = await response.json();

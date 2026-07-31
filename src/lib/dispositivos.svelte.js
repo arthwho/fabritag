@@ -1,3 +1,5 @@
+import { apiPath } from '$lib/api.js';
+
 /**
  * A shared state for sensor statuses.
  * This can be imported into any component to get real-time status.
@@ -42,7 +44,7 @@ class SensorStore {
 
 		const poll = async () => {
 			try {
-				const response = await fetch('http://127.0.0.1:5000/api/dispositivos/status');
+				const response = await fetch(apiPath('/dispositivos/status'));
 				if (response.ok) {
 					this.#statuses = await response.json();
 				}

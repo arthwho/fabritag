@@ -5,6 +5,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { Button, Input, Label, Modal, Select } from '$lib/uicomponents.js';
 	import LoteEditModal from './produtos/LoteEditModal.svelte';
+	import { apiPath } from '$lib/api.js';
 
 	type ProdutoOption = {
 		id: string;
@@ -83,8 +84,8 @@
 
 		try {
 			const [produtosRes, clientesRes] = await Promise.all([
-				fetch('http://127.0.0.1:5000/api/produtos'),
-				fetch('http://127.0.0.1:5000/api/clientes')
+				fetch(apiPath('/produtos')),
+				fetch(apiPath('/clientes'))
 			]);
 			if (!produtosRes.ok) return;
 

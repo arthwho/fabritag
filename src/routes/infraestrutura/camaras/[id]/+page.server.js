@@ -1,3 +1,5 @@
+import { backendUrl } from '$lib/server/backend-api';
+
 /**
  * Converte índice de coluna em letras no padrão A, B, ..., AA.
  *
@@ -70,7 +72,7 @@ function enrichCamara(camaraData) {
 export async function load({ params, fetch }) {
 	const { id } = params;
 	try {
-		const res = await fetch(`http://127.0.0.1:5000/api/camaras/${id}`);
+		const res = await fetch(backendUrl(`/api/camaras/${id}`));
 
 		if (!res.ok) {
 			const errorText = await res.text();
