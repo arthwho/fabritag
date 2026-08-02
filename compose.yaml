@@ -2,14 +2,14 @@ name: fabritag
 
 services:
   database:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-fabritag}
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-fabritag-local}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v18:/var/lib/postgresql
       - ./src/lib/server/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
@@ -93,7 +93,7 @@ services:
       - edge
 
 volumes:
-  postgres_data:
+  postgres_data_v18:
 
 networks:
   edge:

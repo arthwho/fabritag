@@ -49,8 +49,8 @@ serviço compartilhado, como Redis ou PostgreSQL.
 
 ### PostgreSQL
 
-- Imagem oficial `postgres:17-alpine`.
-- Dados persistidos no volume `postgres_data`.
+- Imagem oficial `postgres:18-alpine`.
+- Dados persistidos no volume `postgres_data_v18`.
 - `schema.sql` é executado automaticamente somente quando o volume é criado.
 - A porta do banco é publicada apenas em `127.0.0.1` no ambiente local.
 
